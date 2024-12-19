@@ -95,7 +95,19 @@
 (defun check-scheme (scheme))
 
 ;function that returns the port if is not null, the default port if it is null
-(defun get-port (port) port)
+(defun get-port (scheme given-port)
+  (if given-port
+      given-port
+      (cond
+        ((string-equal scheme "http") 80)
+        ((string-equal scheme "https") 443)
+        ((string-equal scheme "ftp") 21)
+        ((string-equal scheme "mailto") 25)
+        ((string-equal scheme "news") 119)
+        ((string-equal scheme "tel") nil)
+        ((string-equal scheme "fax") nil)
+        ((string-equal scheme "zos") 23)
+        (t nil))))
 
 (defun extract-scheme (uri) "placeholder")
 

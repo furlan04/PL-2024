@@ -92,7 +92,20 @@
 
 
 ;function that returns the schema if it is correct, throws an error instead.
-(defun check-scheme (scheme))
+(defun check-scheme (scheme)
+  (if
+   (or (equal scheme "http")
+        (equal scheme "https")
+        (equal scheme "ftp")
+        (equal scheme "mailto")
+        (equal scheme "news")
+        (equal scheme "tel")
+        (equal scheme "fax")
+        (equal scheme "zos"))
+   scheme
+   (error "the scheme is not valid!")
+   )
+ )
 
 ;function that returns the port if is not null, the default port if it is null
 (defun get-port (port) port)

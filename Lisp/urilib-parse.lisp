@@ -65,7 +65,7 @@
    if (stringp uri) 
    (let
        (
-        (scheme (check-scheme (extract-scheme uri)))
+        (scheme (check-scheme(extract-scheme (coerce uri 'list))))
         (userInfo (extract-userInfo uri))
         (host (extract-host uri))
         (port (extract-port uri))
@@ -75,10 +75,10 @@
       )
         ( 
          make-uri-struct
-         :scheme scheme
-         :userInfo userInfo
+         :scheme (coerce scheme 'string)
+         :userInfo (coerce after 'string)
          :host host
-         :port (get-port port)
+         :port port
          :path path
          :query query
          :fragment fragment
@@ -92,7 +92,7 @@
 
 
 ;function that returns the schema if it is correct, throws an error instead.
-(defun check-scheme (scheme))
+(defun check-scheme (scheme) scheme)
 
 ;function that returns the port if is not null, the default port if it is null
 (defun get-port (scheme given-port)
@@ -109,7 +109,16 @@
         ((string-equal scheme "zos") 23)
         (t nil))))
 
-(defun extract-scheme (uri) "placeholder")
+(defun extract-scheme (chars)
+  (cond ((null chars) (error "Schema is not valid"))
+	((string= (first chars) ":")
+	 (defparameter after (rest chars))
+	 NIL)
+	(T (if (identificatorep (first chars))
+	       (append
+		(list (first chars))
+		(extract-scheme (rest chars)))
+	       (error "invalid schema character")))))
 
 (defun extract-userInfo (uri) "placeholder")
 
@@ -122,3 +131,7 @@
 (defun extract-query (uri) "placeholder")
 
 (defun extract-fragment (uri) "placeholder")
+
+(defun identificatorep (char)
+  (or (alphanumericp char)
+      (string= char " ")))

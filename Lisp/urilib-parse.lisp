@@ -65,7 +65,7 @@
    if (stringp uri) 
    (let
        (
-        (scheme (check-scheme(extract-scheme (coerce uri 'list))))
+        (scheme (check-scheme (coerce (extract-scheme (coerce uri 'list)) 'string)))
         (userInfo (extract-userInfo uri))
         (host (extract-host uri))
         (port (extract-port uri))
@@ -75,7 +75,7 @@
       )
         ( 
          make-uri-struct
-         :scheme (coerce scheme 'string)
+         :scheme scheme
          :userInfo (coerce after 'string)
          :host host
          :port port

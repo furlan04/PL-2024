@@ -65,7 +65,7 @@
    if (stringp uri) 
    (let
        (
-        (scheme (check-scheme (extract-scheme (coerce uri 'list))))
+        (scheme (check-scheme(extract-scheme (coerce uri 'list))))
         (userInfo (extract-userInfo uri))
         (host (extract-host uri))
         (port (extract-port uri))
@@ -76,9 +76,9 @@
         ( 
          make-uri-struct
          :scheme (coerce scheme 'string)
-         :userInfo userInfo
+         :userInfo (coerce after 'string)
          :host host
-         :port (get-port port)
+         :port port
          :path path
          :query query
          :fragment fragment
@@ -92,7 +92,20 @@
 
 
 ;function that returns the schema if it is correct, throws an error instead.
-(defun check-scheme (scheme))
+(defun check-scheme (scheme)
+  (if
+   (or (equal scheme "http")
+        (equal scheme "https")
+        (equal scheme "ftp")
+        (equal scheme "mailto")
+        (equal scheme "news")
+        (equal scheme "tel")
+        (equal scheme "fax")
+        (equal scheme "zos"))
+   scheme
+   (error "the scheme is not valid!")
+   )
+ )
 
 ;function that returns the port if is not null, the default port if it is null
 (defun get-port (scheme given-port)

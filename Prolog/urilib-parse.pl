@@ -12,6 +12,9 @@ scheme_parser(http, parse_http_uri).
 scheme_parser(https, parse_https_uri).
 scheme_parser(ftp, parse_ftp_uri).
 scheme_parser(mailto, parse_mailto_uri).
+scheme_parser(news, parse_news_uri).
+scheme_parser(tel, parse_tel_uri).
+scheme_parser(fax, parse_fax_uri).
 
 % HTTP URI parser
 parse_http_uri(Rest, uri(http, UserInfo, Host, Port, PathSegments, Query, Fragment)) :-
@@ -34,6 +37,12 @@ parse_ftp_uri(Rest, uri(ftp, UserInfo, Host, Port, PathSegments, [], [])) :-
 % MAILTO URI parser
 parse_mailto_uri(Rest, uri(mailto, UserInfo, Host, 25, [], [], [])) :-
     parse_mailto_parts(Rest, UserInfo, Host).
+
+% News URI parser
+parse_news_uri(Rest, uri(news, [], Host, 0, [], [], [])) :-
+    % Per news non c'è // quindi prendiamo direttamente l'host
+    atom_codes(Host, Rest),
+    validate_host(Host).
 
 % Scheme parsing
 parse_scheme([], _, _, _) :- fail.
@@ -161,6 +170,22 @@ parse_mailto_parts(Chars, UserInfo, Host) :-
     ;   
         parse_userinfo(Chars, [], UserInfo),
         Host = '').
+
+% Tel URI parser
+parse_tel_uri(Rest, uri(tel, [UserInfo], '', 0, [], [], [])) :-
+    % Per tel prendiamo tutto come userinfo
+    parse_userinfo_tel(Rest, [], [UserInfo]).
+
+parse_fax_uri(Rest, uri(fax, [UserInfo], '', 0, [], [], [])) :-
+    % Per tel prendiamo tutto come userinfo
+    parse_userinfo_tel(Rest, [], [UserInfo]).
+
+% Parser specifico per tel userinfo che non richiede validazione speciale
+parse_userinfo_tel([], Acc, [UserInfo]) :-
+    atom_codes(UserInfo, Acc).
+parse_userinfo_tel([Char | Rest], Acc, UserInfo) :-
+    append(Acc, [Char], NewAcc),
+    parse_userinfo_tel(Rest, NewAcc, UserInfo).
 
 % Path, query and fragment parsing with percent-decoding
 parse_path_query_fragment(Path, PathSegments, Query, Fragment) :-

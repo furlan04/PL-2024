@@ -117,9 +117,11 @@
 
 (defun extract-scheme (chars)
   (cond ((null chars) (error "Schema is not valid"))
-	((string= (first chars) ":")
+	(
+         (string= (first chars) ":")
 	 (defparameter after (rest chars))
-	 NIL)
+         NIL
+         )
 	(T (if (identificatorep (first chars))
 	       (append
 		(list (first chars))
@@ -132,7 +134,25 @@
 
 (defun extract-port (uri) "placeholder")
 
-(defun extract-path (uri) "placeholder")
+(defun extract-path (chars) 
+  (
+    cond 
+    ((null chars) NIL)
+    ((string= (first chars) "?") 
+     (defparameter after (rest chars))
+     (if (not (contains-single chars "?")) 
+         (error "uri cannot contain more than 2 queries") 
+       NIL
+     ))
+     
+    (T 
+     (if (identificatorep (first chars))
+         (append (list (first chars)) (extract-path (rest chars)))
+       (error "invalid path character ~c" (first chars))
+       )
+     )
+    )
+  )
 
 (defun extract-query (uri) "placeholder")
 
@@ -140,19 +160,23 @@
 
 (defun identificatorep (char)
   (or (alphanumericp char)
-      (string= char " ")))
+      (string= char "=")
+      (string= char "@")
+      (string= char ";")
+      (string= char "/")
+      ))
 
 (defun contains-single (chars char2Check &optional (alreadyFound nil)) 
   (
    cond 
-   ((null chars)(not alreadyFound))
-   ((equal (first chars) char2Check)
+   ((null chars)alreadyFound)
+   ((string= (first chars) char2Check)
     (
      if (equal alreadyFound T)
      nil
       (contains-single (rest chars) char2Check T)
      )
     )
-   (T (contains-single (rest chars) char2Check))
-   )
+   (T  (contains-single (rest chars) char2Check alreadyFound))
   )
+)

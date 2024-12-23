@@ -93,8 +93,17 @@
 
 
 ;function that returns the schema if it is correct, throws an error instead.
+;function that returns the schema if it is correct, throws an error instead.
 (defun isSpecial (scheme)
-  NIL
+  (if
+   (or (equal scheme "mailto")
+        (equal scheme "news")
+        (equal scheme "tel")
+        (equal scheme "fax")
+        (equal scheme "zos"))
+   scheme
+   (error "the scheme is not valid!")
+   )
  )
 
 ;function called if it is a special scheme
@@ -126,11 +135,11 @@
 		(extract-scheme (rest chars)))
 	       (error "invalid schema character")))))
 
-(defun extract-userInfo (uri) "placeholder")
+(defun extract-userinfo (chars) "placeholder")
 
-(defun extract-host (uri) "placeholder")
+(defun extract-host (chars)"placeholder")
 
-(defun extract-port (uri) "placeholder")
+(defun extract-port (chars) "placeholder")
 
 (defun extract-path (uri) "placeholder")
 
@@ -145,7 +154,7 @@
 (defun contains-single (chars char2Check &optional (alreadyFound nil)) 
   (
    cond 
-   ((null chars)(not alreadyFound))
+   ((null chars)alreadyFound)
    ((equal (first chars) char2Check)
     (
      if (equal alreadyFound T)
@@ -153,6 +162,42 @@
       (contains-single (rest chars) char2Check T)
      )
     )
-   (T (contains-single (rest chars) char2Check))
-   )
+   (T  (contains-single (rest chars) char2Check alreadyFound))
   )
+)
+
+
+    (defun special-scheme (scheme after) 
+  (cond ((string= scheme "mailto")
+         (let ((schema scheme)
+               (userinfo (coerce (extract-userinfo after) 'string))
+               (host  (if (contains-single after "@")
+                          (coerce (extract-host after) 'string)))
+               (port (get-port scheme NIL)))
+               (if (not (null after)) 
+                   (error "Non corretto")
+               ;; Rimuovi il ramo vuoto o gestisci un'alternativa
+               (make-uri-struct
+                :scheme schema
+                :userinfo userinfo
+                :host host
+                :port port))))
+
+	((string= scheme "news") 
+	 (make-uri-struct
+	  :scheme "sas"
+	  :host ;(if (or (contains-single after "@")
+			;(contains-single after ":"))
+		    ;(error "Host non valido")
+		    (coerce (extract-host after) 'string)
+	  :port (get-port scheme NIL)))))
+          ; if (or (contains-single after "/")
+                    ; (contains-single after "?")
+                     ;(contains-single after "#"))
+               ; (error "Schema non corretto")
+         
+          ;(if (or (contains-single after "/")
+                     ;(contains-single after "?")
+                     ;(contains-single after "#"))
+                ;(error "Schema non corretto")
+                ;())

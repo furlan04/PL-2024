@@ -43,17 +43,19 @@
                     :host host :port port :path path :query query :fragment fragment)
   )
 
-(defun urilib-display (uri &optional (stream T)) 
-  (if (not (typep uri 'URI-STRUCT))
+
+
+(defun urilib-display (urilib-struct &optional (stream T)) 
+  (if (not (typep urilib-struct 'URI-STRUCT))
       (error "incompatible type")
       (progn 
-        (format stream "Scheme: ~13T ~S ~%" (urilib-scheme uri) )
-        (format stream "UserInfo: ~13T ~S ~%" (urilib-userInfo uri) )
-        (format stream "Host: ~13T ~S ~%" (urilib-host uri) )
-        (format stream "Port: ~13T ~S ~%" (urilib-port uri) )
-        (format stream "Path: ~13T ~S ~%" (urilib-path uri) )
-        (format stream "Query: ~13T ~S ~%" (urilib-query uri) )
-        (format stream "Fragment: ~13T ~S" (urilib-fragment uri) )
+        (format stream "Scheme: ~13T ~S ~%" (urilib-scheme urilib-struct) )
+        (format stream "UserInfo: ~13T ~S ~%" (urilib-userInfo urilib-struct) )
+        (format stream "Host: ~13T ~S ~%" (urilib-host urilib-struct) )
+        (format stream "Port: ~13T ~S ~%" (urilib-port urilib-struct) )
+        (format stream "Path: ~13T ~S ~%" (urilib-path urilib-struct) )
+        (format stream "Query: ~13T ~S ~%" (urilib-query urilib-struct) )
+        (format stream "Fragment: ~13T ~S" (urilib-fragment urilib-struct) )
         (if (not (equal stream T)) (close stream) t)
         )
    
@@ -65,26 +67,25 @@
    if (stringp uri) 
    (let
        (
-        (scheme (check-scheme(extract-scheme (coerce uri 'list))))
-        (userInfo (extract-userInfo uri))
-        (host (extract-host uri))
-        (port (extract-port uri))
-        (path (extract-path uri))
-        (query (extract-query uri))
-        (fragment (extract-fragment uri))
-      )
-        ( 
-         make-uri-struct
-         :scheme (coerce scheme 'string)
-         :userInfo (coerce after 'string)
-         :host host
-         :port port
-         :path path
-         :query query
-         :fragment fragment
-         ) )
+        (scheme  (coerce (extract-scheme (coerce uri 'list)) 'string))
+        )
+     ( 
+      if (isSpecial scheme)
+      (special-scheme scheme after)
+       (
+        make-uri-struct
+        :scheme scheme
+        :userInfo (extract-userInfo after)
+        :host (extract-host after)
+        :port (extract-port after)
+        :path (extract-path after)
+        :query (extract-query after)
+        :fragment (extract-fragment after)
+        )
+       )
+     )
     (error "uri passed is not a string!")
-   )
+    )
   )
 
 
@@ -92,21 +93,12 @@
 
 
 ;function that returns the schema if it is correct, throws an error instead.
-(defun check-scheme (scheme)
-  (if
-   (or (equal scheme "http")
-        (equal scheme "https")
-        (equal scheme "ftp")
-        (equal scheme "mailto")
-        (equal scheme "news")
-        (equal scheme "tel")
-        (equal scheme "fax")
-        (equal scheme "zos"))
-   scheme
-   (error "the scheme is not valid!")
-   )
+(defun isSpecial (scheme)
+  NIL
  )
 
+;;
+(defun special-scheme (scheme after) "sas")
 ;function that returns the port if is not null, the default port if it is null
 (defun get-port (scheme given-port)
   (if given-port
@@ -148,3 +140,18 @@
 (defun identificatorep (char)
   (or (alphanumericp char)
       (string= char " ")))
+
+(defun contains-single (chars char2Check &optional (alreadyFound nil)) 
+  (
+   cond 
+   ((null chars)(not alreadyFound))
+   ((equal (first chars) char2Check)
+    (
+     if (equal alreadyFound T)
+     (nil)
+      (contains-single (rest chars) char2Check T)
+     )
+    )
+   (T (contains-single (rest chars) char2Check))
+   )
+  )

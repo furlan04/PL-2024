@@ -78,7 +78,7 @@
         :userInfo (extract-userInfo after)
         :host (extract-host after)
         :port (extract-port after)
-        :path (extract-path after)
+        :path (if (string= (first after) "/") (coerce (extract-path (rest after)) 'string) nil)
         :query (extract-query after)
         :fragment (extract-fragment after)
         )
@@ -92,15 +92,11 @@
 ;function that returns the schema if it is correct, throws an error instead.
 ;function that returns the schema if it is correct, throws an error instead.
 (defun isSpecial (scheme)
-  (if
-   (or (equal scheme "mailto")
+   or (equal scheme "mailto")
         (equal scheme "news")
         (equal scheme "tel")
         (equal scheme "fax")
-        (equal scheme "zos"))
-   scheme
-   (error "the scheme is not valid!")
-   )
+        (equal scheme "zos")
  )
 
 ;function that returns the port if is not null, the default port if it is null
@@ -140,14 +136,15 @@
 
 (defun extract-port (chars) "placeholder")
 
+
 (defun extract-path (chars) 
   (
     cond 
     ((null chars) NIL)
-    ((string= (first chars) "?") 
-     (defparameter after (rest chars))
-     (if (not (contains-single chars "?")) 
-         (error "uri cannot contain more than 2 queries") 
+    ((or (string= (first chars) "?") (string= (first chars) "#")) 
+     (defparameter after chars)
+     (if (and (not (contains-at-most-one chars "?")) (not (contains-at-most-one chars "#"))) 
+         (error "uri cannot contain more than 2 queries or fragments") 
        NIL
      ))
      
@@ -172,18 +169,19 @@
       (string= char "/")
       ))
 
-(defun contains-single (chars char2Check &optional (alreadyFound nil)) 
+;;returns true if the chars passed containes 0 or 1 occurence of the specified character
+(defun contains-at-most-one (chars char2Check &optional (alreadyFound nil)) 
   (
    cond 
-   ((null chars)alreadyFound)
+   ((null chars) T)
    ((string= (first chars) char2Check)
     (
      if (equal alreadyFound T)
      nil
-      (contains-single (rest chars) char2Check T)
+      (contains-at-most-one (rest chars) char2Check T)
      )
     )
-   (T  (contains-single (rest chars) char2Check alreadyFound))
+   (T  (contains-at-most-one (rest chars) char2Check alreadyFound))
    ))
 
 ;if ancora da implementare

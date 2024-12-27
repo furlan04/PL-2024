@@ -40,7 +40,7 @@
 ;;this function must disappear!
 (defun create-struct-temp (scheme userInfo host port path query fragment) 
   (make-uri-struct :scheme scheme :userInfo userInfo
-                    :host host :port port :path path :query query :fragment fragment)
+                   :host host :port port :path path :query query :fragment fragment)
   )
 
 
@@ -48,18 +48,18 @@
 (defun urilib-display (urilib-struct &optional (stream T)) 
   (if (not (typep urilib-struct 'URI-STRUCT))
       (error "incompatible type")
-      (progn 
-        (format stream "Scheme: ~13T ~S ~%" (urilib-scheme urilib-struct) )
-        (format stream "UserInfo: ~13T ~S ~%" (urilib-userInfo urilib-struct) )
-        (format stream "Host: ~13T ~S ~%" (urilib-host urilib-struct) )
-        (format stream "Port: ~13T ~S ~%" (urilib-port urilib-struct) )
-        (format stream "Path: ~13T ~S ~%" (urilib-path urilib-struct) )
-        (format stream "Query: ~13T ~S ~%" (urilib-query urilib-struct) )
-        (format stream "Fragment: ~13T ~S" (urilib-fragment urilib-struct) )
-        (if (not (equal stream T)) (close stream) t)
-        )
-   
+    (progn 
+      (format stream "Scheme: ~13T ~S ~%" (urilib-scheme urilib-struct) )
+      (format stream "UserInfo: ~13T ~S ~%" (urilib-userInfo urilib-struct) )
+      (format stream "Host: ~13T ~S ~%" (urilib-host urilib-struct) )
+      (format stream "Port: ~13T ~S ~%" (urilib-port urilib-struct) )
+      (format stream "Path: ~13T ~S ~%" (urilib-path urilib-struct) )
+      (format stream "Query: ~13T ~S ~%" (urilib-query urilib-struct) )
+      (format stream "Fragment: ~13T ~S" (urilib-fragment urilib-struct) )
+      (if (not (equal stream T)) (close stream) t)
       )
+    
+    )
   )
 
 (defun urilib-parse (uri)
@@ -79,8 +79,8 @@
         :host (extract-host after)
         :port (extract-port after)
         :path (if (string= (first after) "/") (coerce (extract-path (rest after)) 'string) nil)
-        :query (extract-query after)
-        :fragment (extract-fragment after)
+        :query (if (string= (first after) "?") (coerce (extract-query (rest after)) 'string) nil)
+        :fragment (if (string= (first after) "#") (coerce (extract-query (rest after)) 'string) nil)
         )
        )
      )
@@ -102,16 +102,16 @@
 (defun get-port (scheme given-port)
   (if given-port
       given-port
-      (cond
-        ((string-equal scheme "http") 80)
-        ((string-equal scheme "https") 443)
-        ((string-equal scheme "ftp") 21)
-        ((string-equal scheme "mailto") 25)
-        ((string-equal scheme "news") 119)
-        ((string-equal scheme "tel") nil)
-        ((string-equal scheme "fax") nil)
-        ((string-equal scheme "zos") 23)
-        (t nil))))
+    (cond
+     ((string-equal scheme "http") 80)
+     ((string-equal scheme "https") 443)
+     ((string-equal scheme "ftp") 21)
+     ((string-equal scheme "mailto") 25)
+     ((string-equal scheme "news") 119)
+     ((string-equal scheme "tel") nil)
+     ((string-equal scheme "fax") nil)
+     ((string-equal scheme "zos") 23)
+     (t nil))))
 
 (defun extract-scheme (chars)
   (cond ((null chars) (error "Schema is not valid"))
@@ -124,7 +124,7 @@
 	       (append
 		(list (first chars))
 		(extract-scheme (rest chars)))
-	       (error "invalid schema character")))))
+             (error "invalid schema character")))))
 
 ;not already implemented functions:
 
@@ -138,15 +138,15 @@
 
 (defun extract-path (chars) 
   (
-    cond 
+   cond 
     ((null chars) NIL)
     ((or (string= (first chars) "?") (string= (first chars) "#")) 
      (defparameter after chars)
      (if (and (not (contains-at-most-one chars "?")) (not (contains-at-most-one chars "#"))) 
          (error "uri cannot contain more than 2 queries or fragments") 
        NIL
-     ))
-     
+       ))
+    
     (T 
      (if (identificatorep (first chars))
          (append (list (first chars)) (extract-path (rest chars)))
@@ -156,23 +156,66 @@
     )
   )
 
-(defun extract-query (uri) "placeholder")
+(defun extract-query (chars)
+  (
+   cond 
+   ((null chars) NIL)
+   ((string= (first chars) "#") 
+    (defparameter after chars)
+    (if (not (contains-at-most-one chars "#")) 
+        (error "uri cannot contain more than 2 fragments") 
+      NIL
+      ))
+   
+   (T 
+    (if (identificatorep (first chars))
+        (append (list (first chars)) (extract-path (rest chars)))
+      (error "invalid path character ~c" (first chars))
+      )
+    )
+   )
+  )
 
-(defun extract-fragment (uri) "placeholder")
+(defun extract-fragment (chars)
+  (
+   cond 
+   ((null chars) NIL)
+   (T 
+    (if (identificatorep (first chars))
+        (append (list (first chars)) (extract-path (rest chars)))
+      (error "invalid path character ~c" (first chars))
+      )
+    )
+   )
+  )
 
 (defun identificatorep (char)
   (or (alphanumericp char)
-      (string= char "=")
-      (string= char "@")
+      (string= char " ")
+      (string= char "-")
+      (string= char ".")
+      (string= char "_")
+      (string= char "~")
+      (string= char "[")
+      (string= char "]")
+      (string= char "!")
+      (string= char "$")
+      (string= char "&")
+      (string= char "'")
+      (string= char "(")
+      (string= char ")")
+      (string= char "*")
+      (string= char "+")
+      (string= char ",")
       (string= char ";")
-      (string= char "/")
-      ))
+      (string= char "=")
+      (string= char "/")))
 
 
 (defun contains-char (after char)
   (cond ((null after) NIL)
-    ((string= (first after) char) T)
-    (T (contains-char (rest after) char))))
+        ((string= (first after) char) T)
+        (T (contains-char (rest after) char))))
 
 ;;returns true if the chars passed containes 0 or 1 occurence of the specified character
 (defun contains-at-most-one (chars char2Check &optional (alreadyFound nil)) 
@@ -207,7 +250,7 @@
               :userinfo userinfo
               :host host
               :port port))))
-
+        
         ((string= scheme "news")
          (let ((schema scheme)
                (userinfo (coerce (extract-userinfo after) 'string))
@@ -226,7 +269,7 @@
               :userinfo userinfo
               :host host
               :port port))))
-
+        
         ((or (string= scheme "tel") (string= scheme "fax"))
          (let ((schema scheme)
                (userinfo (coerce (extract-userinfo after) 'string))
@@ -244,5 +287,5 @@
               :userinfo userinfo
               :host host
               :port port))))
-))
+        ))
        

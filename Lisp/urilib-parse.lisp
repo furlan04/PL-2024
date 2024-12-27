@@ -92,16 +92,12 @@
 ;function that returns the schema if it is correct, throws an error instead.
 ;function that returns the schema if it is correct, throws an error instead.
 (defun isSpecial (scheme)
-  (if
-   (or (equal scheme "mailto")
-        (equal scheme "news")
-        (equal scheme "tel")
-        (equal scheme "fax")
-        (equal scheme "zos"))
-   scheme
-   (error "the scheme is not valid!")
-   )
- )
+  (or (equal scheme "mailto")
+      (equal scheme "news")
+      (equal scheme "tel")
+      (equal scheme "fax")
+      (equal scheme "zos"))
+  )
 
 ;function that returns the port if is not null, the default port if it is null
 (defun get-port (scheme given-port)
@@ -172,6 +168,11 @@
       (string= char "/")
       ))
 
+(defun contains-char (after char)
+  (cond ((null after) NIL)
+	((string= (first after) char) T)
+	(T (contains-char (rest after) char))))
+
 (defun contains-single (chars char2Check &optional (alreadyFound nil)) 
   (
    cond 
@@ -191,33 +192,55 @@
   (cond ((string= scheme "mailto")
          (let ((schema scheme)
                (userinfo (coerce (extract-userinfo after) 'string))
-               (host  (if (contains-single after "@")
+               (host  (if (contains-char after "@")
                           (coerce (extract-host after) 'string)))
                (port (get-port scheme NIL)))
-           (if (not (null after)) 
+           (if (or (contains-char after "/")
+                   (contains-char after "@")
+                   (contains-char after "#")
+                   (contains-char after "?"))
                (error "Non corretto")
-             ;; Rimuovi il ramo vuoto o gestisci un'alternativa
              (make-uri-struct
               :scheme schema
               :userinfo userinfo
               :host host
               :port port))))
-        
-        ((string= scheme "news") 
-         (make-uri-struct
-          :scheme "sas"
-          :host ;(if (or (contains-single after "@")
-			;(contains-single after ":"))
-		    ;(error "Host non valido")
-          (coerce (extract-host after) 'string)
-          :port (get-port scheme NIL)))))
-          ; if (or (contains-single after "/")
-                    ; (contains-single after "?")
-                     ;(contains-single after "#"))
-               ; (error "Schema non corretto")
 
-          ;(if (or (contains-single after "/")
-                     ;(contains-single after "?")
-                     ;(contains-single after "#"))
-                ;(error "Schema non corretto")
-                ;())
+        ((string= scheme "news")
+         (let ((schema scheme)
+               (userinfo (coerce (extract-userinfo after) 'string))
+               (host   (if (or (contains-char after "@")
+                               (contains-char after ":"))
+                           (error "Host non valido")
+                         (coerce (extract-host after) 'string)))        
+               (port (get-port scheme NIL)))
+           (if (or (contains-char after "/")
+                   (contains-char after "@")
+                   (contains-char after "#")
+                   (contains-char after "?"))
+               (error "Non corretto")
+             (make-uri-struct
+              :scheme schema
+              :userinfo userinfo
+              :host host
+              :port port))))
+
+        ((or (string= scheme "tel") (string= scheme "fax"))
+         (let ((schema scheme)
+               (userinfo (coerce (extract-userinfo after) 'string))
+               (host (if (or (contains-char after "@"))
+                         (error "Host non valido")
+                       (coerce (extract-host after) 'string)))        
+               (port (get-port scheme NIL)))
+           (if (or (contains-char after "/")
+                   (contains-char after "@")
+                   (contains-char after "#")
+                   (contains-char after "?"))
+               (error "Non corretto")
+             (make-uri-struct
+              :scheme schema
+              :userinfo userinfo
+              :host host
+              :port port))))
+))
+       

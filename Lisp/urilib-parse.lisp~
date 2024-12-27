@@ -194,7 +194,10 @@
                (host  (if (contains-single after "@")
                           (coerce (extract-host after) 'string)))
                (port (get-port scheme NIL)))
-           (if (not (null after)) 
+           (if (or (contains-single after "/")
+                   (contains-single after "@")
+                   (contains-single after "#")
+                   (contains-single after "?"))
                (error "Non corretto")
              ;; Rimuovi il ramo vuoto o gestisci un'alternativa
              (make-uri-struct

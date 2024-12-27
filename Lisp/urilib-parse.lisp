@@ -89,6 +89,7 @@
   )
 
 
+
 (defun isSpecial (scheme)
   (or (string= scheme "mailto")
       (string= scheme "news")
@@ -130,42 +131,6 @@
 
 (defun extract-userinfo (chars) "placeholder")
 
-(defun urilib-parse (uri)
-  (
-   if (stringp uri) 
-   (let
-       (
-        (scheme  (coerce (extract-scheme (coerce uri 'list)) 'string))
-        )
-     ( 
-      if (isSpecial scheme)
-      (special-scheme scheme after)
-       (
-        make-uri-struct
-        :scheme scheme
-        :userInfo (extract-userInfo after)
-        :host (extract-host after)
-        :port (extract-port after)
-        :path (extract-path after)
-        :query (extract-query after)
-        :fragment (extract-fragment after)
-        )
-       )
-     )
-    (error "uri passed is not a string!")
-    )
-  )
-
-
-;function that returns the schema if it is correct, throws an error instead.
-(defun isSpecial (scheme)
-  (if (or (equal scheme "mailto")
-      (equal scheme "news")
-      (equal scheme "tel")
-      (equal scheme "fax")
-      (equal scheme "zos"))
-      scheme)
-  )
 (defun extract-host (chars)"placeholder")
 
 (defun extract-port (chars) "placeholder")

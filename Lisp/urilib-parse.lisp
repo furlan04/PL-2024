@@ -89,14 +89,13 @@
   )
 
 
-;function that returns the schema if it is correct, throws an error instead.
-;function that returns the schema if it is correct, throws an error instead.
+
 (defun isSpecial (scheme)
-  (or (equal scheme "mailto")
-      (equal scheme "news")
-      (equal scheme "tel")
-      (equal scheme "fax")
-      (equal scheme "zos"))
+  (or (string= scheme "mailto")
+      (string= scheme "news")
+      (string= scheme "tel")
+      (string= scheme "fax")
+      (string= scheme "zos"))
   )
 
 ;function that returns the port if is not null, the default port if it is null

@@ -169,7 +169,7 @@
 (defun extract-userinfo (chars)
   (
    cond 
-   ((null chars) (error "no host specified"))
+   ((null chars) NIL)
    ((string= (first chars) "@") 
     (defparameter after chars)
     NIL

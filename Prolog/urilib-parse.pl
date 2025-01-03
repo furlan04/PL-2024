@@ -76,10 +76,46 @@ validate_scheme_chars([First|Rest]) :-
     maplist(valid_scheme_char, Rest).
 
 % Generic URI Parser
+% Generic URI Parser with Path Fix
 parse_generic_uri(Scheme, Rest, uri(Scheme, UserInfo, Host, Port, PathSegments, Query, Fragment)) :-
-    parse_authority(Rest, Scheme, Host, UserInfo, Port, Path),
-    parse_path_query_fragment(Path, PathSegments, Query, Fragment),
+    parse_authority(Rest, Scheme, Host, UserInfo, Port, PathCodes),
+    % Convert PathCodes to proper format if it's an atom
+    (atom(PathCodes) -> 
+        atom_codes(PathCodes, PathChars)
+    ;
+        PathChars = PathCodes
+    ),
+    % Ensure path starts with /
+    (PathChars = [47|_] -> 
+        FinalPathCodes = PathChars
+    ;
+        FinalPathCodes = [47|PathChars]
+    ),
+    parse_path_query_fragment(FinalPathCodes, PathSegments, Query, Fragment),
     validate_port(Port, Scheme).
+
+% Authority Parser with Path Codes Fix
+parse_authority([47, 47|Authority], Scheme, Host, UserInfo, Port, Path) :-
+    parse_authority_content(Authority, Scheme, Host, UserInfo, Port, Path), !.
+parse_authority(Path, _, '', [], 0, Path).
+
+parse_authority_content(Authority, Scheme, Host, UserInfo, Port, Path) :-
+    (append(UserInfoChars, [64|HostPortPath], Authority) ->
+        parse_userinfo(UserInfoChars, [], UserInfo),
+        parse_host_port_path(HostPortPath, Scheme, Host, Port, Path)
+    ;
+        parse_host_port_path(Authority, Scheme, Host, Port, Path),
+        UserInfo = []
+    ).
+
+parse_host_port_path(Input, Scheme, Host, Port, Path) :-
+    (append(HostPort, [47|PathChars], Input) ->
+        Path = [47|PathChars],
+        parse_host_port(HostPort, Scheme, Host, Port)
+    ;
+        parse_host_port(Input, Scheme, Host, Port),
+        Path = [47]
+    ).
 
 % Special URI Parsers
 parse_zos_uri(Rest, uri(zos, [], '', 0, PathSegments, [], [])) :-
@@ -97,29 +133,6 @@ parse_tel_uri(Rest, uri(tel, [UserInfo], '', 0, [], [], [])) :-
 
 parse_fax_uri(Rest, uri(fax, [UserInfo], '', 0, [], [], [])) :-
     parse_userinfo_tel(Rest, [], [UserInfo]).
-
-% Authority Parser
-parse_authority([47, 47|Authority], Scheme, Host, UserInfo, Port, Path) :-
-    parse_authority_content(Authority, Scheme, Host, UserInfo, Port, Path).
-
-parse_authority_content(Authority, Scheme, Host, UserInfo, Port, Path) :-
-    (append(UserInfoChars, [64|HostPortPath], Authority) ->
-        parse_userinfo(UserInfoChars, [], UserInfo),
-        parse_host_port_path(HostPortPath, Scheme, Host, Port, Path)
-    ;
-        parse_host_port_path(Authority, Scheme, Host, Port, Path),
-        UserInfo = []
-    ).
-
-% Host and Port Parser
-parse_host_port_path(Input, Scheme, Host, Port, Path) :-
-    (append(HostPort, [47|PathChars], Input) ->
-        atom_codes(Path, [47|PathChars]),
-        parse_host_port(HostPort, Scheme, Host, Port)
-    ;
-        parse_host_port(Input, Scheme, Host, Port),
-        Path = ""
-    ).
 
 parse_host_port(Input, Scheme, Host, Port) :-
     (append(HostChars, [58|PortChars], Input) ->
@@ -144,7 +157,7 @@ validate_port(Port, _) :-
 default_port(http, 80).
 default_port(https, 443).
 default_port(ftp, 21).
-default_port(_, 0).
+default_port(_, 80).
 
 % Host Validation
 validate_host(Host) :-
@@ -237,8 +250,7 @@ parse_mailto_parts(Chars, UserInfo, Host) :-
     ).
 
 % Path, Query and Fragment Parser
-parse_path_query_fragment(Path, PathSegments, Query, Fragment) :-
-    atom_codes(Path, PathCodes),
+parse_path_query_fragment(PathCodes, PathSegments, Query, Fragment) :-
     split_path_query_fragment(PathCodes, PathOnly, QueryCodes, FragmentCodes),
     decode_path_segments(PathOnly, PathSegments),
     decode_query(QueryCodes, Query),
@@ -254,34 +266,55 @@ split_at(Codes, Char, Before, After) :-
 
 % Path Segments Parser
 decode_path_segments(PathCodes, Segments) :-
-    (PathCodes = [47|Rest] -> % starts with /
-        split_segments(Rest, [], [], ReversedSegments),
-        reverse(ReversedSegments, RawSegments)
+    (PathCodes = [] -> 
+        Segments = []
+    ; PathCodes = [47|Rest] ->  % starts with /
+        (Rest = [] -> 
+            Segments = []
+        ;
+            split_segments(Rest, [], [], ReversedSegments),
+            reverse(ReversedSegments, RawSegments),
+            validate_path_segments(RawSegments),
+            maplist(atom_codes, Segments, RawSegments)
+        )
     ;
         split_segments(PathCodes, [], [], ReversedSegments),
-        reverse(ReversedSegments, RawSegments)
-    ),
-    maplist(validate_path_segment, RawSegments),
-    maplist(decode_segment, RawSegments, Segments).
+        reverse(ReversedSegments, RawSegments),
+        validate_path_segments(RawSegments),
+        maplist(atom_codes, Segments, RawSegments)
+    ).
 
-% AGGIUNGI questi predicati
+% Validate each segment is non-empty and contains only valid characters
+validate_path_segments([]).
+validate_path_segments([Segment|Rest]) :-
+    Segment \= [],  % reject empty segments
+    maplist(valid_path_char, Segment),
+    validate_path_segments(Rest).
+
+% Valid path characters (excluding special characters)
 valid_path_char(Code) :-
-    valid_identifier_char(Code).
-
-validate_path_segment(Codes) :-
-    maplist(valid_path_char, Codes).
+    char_type(Code, alnum), !;  % letters and numbers
+    Code = 45, !;  % hyphen
+    Code = 95.     % underscore
 
 split_segments([], [], Acc, Acc).
 split_segments([], CurrAcc, Acc, [Segment|Acc]) :-
-    atom_codes(Segment, CurrAcc).
+    decode_percent_encoded(CurrAcc, DecodedCodes),
+    DecodedCodes \= [],  % reject empty segments
+    maplist(valid_path_char, DecodedCodes),
+    Segment = DecodedCodes.
 split_segments([47|Rest], CurrAcc, Acc, Segments) :- % /
-    atom_codes(Segment, CurrAcc),
-    split_segments(Rest, [], [Segment|Acc], Segments).
+    decode_percent_encoded(CurrAcc, DecodedCodes),
+    DecodedCodes \= [],  % reject empty segments
+    maplist(valid_path_char, DecodedCodes),
+    split_segments(Rest, [], [DecodedCodes|Acc], Segments).
 split_segments([Code|Rest], CurrAcc, Acc, Segments) :-
     append(CurrAcc, [Code], NewAcc),
     split_segments(Rest, NewAcc, Acc, Segments).
 
-% ZOS Path Parser
+validate_path_segment(Codes) :-
+    maplist(valid_path_char, Codes).
+
 % ZOS Path Parser
 parse_zos_path([], _) :- fail.  % reject empty path
 parse_zos_path(PathCodes, PathSegments) :-
@@ -306,7 +339,7 @@ validate_id44_segment(Codes, Id44) :-
     length(Codes, Len),
     Len > 0,
     Len =< 44,
-    Codes = [First|Rest],
+    Codes = [First|_],
     char_type(First, alpha),              % deve iniziare con lettera
     \+ (append(_, [46], Codes)),          % non può terminare con punto
     \+ (append(_, [46,46|_], Codes)),     % non può avere punti consecutivi
@@ -318,7 +351,7 @@ validate_id8_segment(Codes, Id8) :-
     length(Codes, Len),
     Len > 0,
     Len =< 8,
-    Codes = [First|Rest],
+    Codes = [First|_],
     char_type(First, alpha),              % deve iniziare con lettera
     maplist(valid_id8_char, Codes),
     atom_codes(Id8, Codes).

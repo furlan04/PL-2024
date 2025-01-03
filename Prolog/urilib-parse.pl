@@ -117,10 +117,7 @@ parse_host_port_path(Input, Scheme, Host, Port, Path) :-
         Path = [47]
     ).
 
-% Special URI Parsers
-parse_zos_uri(Rest, uri(zos, [], '', 0, PathSegments, [], [])) :-
-    parse_zos_path(Rest, PathSegments).
-
+% Special URI Parser
 parse_mailto_uri(Rest, uri(mailto, UserInfo, Host, 25, [], [], [])) :-
     parse_mailto_parts(Rest, UserInfo, Host).
 
@@ -316,6 +313,24 @@ validate_path_segment(Codes) :-
     maplist(valid_path_char, Codes).
 
 % ZOS Path Parser
+% Special URI Parsers
+parse_zos_uri(Rest, uri(zos, [], Host, 0, PathSegments, [], [])) :-
+    parse_zos_authority(Rest, Host, PathCodes),
+    parse_zos_path(PathCodes, PathSegments).
+
+% Parse ZOS authority section
+parse_zos_authority([47, 47|Authority], Host, PathCodes) :-
+    (append(HostPart, [47|Path], Authority) ->
+        atom_codes(Host, HostPart),
+        validate_host(Host),
+        PathCodes = Path
+    ;
+        atom_codes(Host, Authority),
+        validate_host(Host),
+        PathCodes = []
+    ).
+
+% ZOS Path Parser
 parse_zos_path([], _) :- fail.  % reject empty path
 parse_zos_path(PathCodes, PathSegments) :-
     split_and_validate_zos_segments(PathCodes, PathSegments).
@@ -323,15 +338,13 @@ parse_zos_path(PathCodes, PathSegments) :-
 % Gestisce entrambi i casi: id44(id8) e solo id44
 split_and_validate_zos_segments(Codes, [Id44, Id8]) :-
     append(Id44Codes, [40|Rest], Codes),  % split at (
-    append(Id8Codes, [41|[]], Rest),      % deve terminare esattamente con )
-    \+ member(40, Id44Codes),             % no ( in id44
-    \+ member(41, Id44Codes),             % no ) in id44
+    append(Id8Codes, [41|[]], Rest),      % deve terminare con )
     validate_id44_segment(Id44Codes, Id44),
     validate_id8_segment(Id8Codes, Id8),
     !.
 split_and_validate_zos_segments(Codes, [Id44]) :-
-    \+ member(40, Codes),                 % no parentesi aperte senza chiusura
-    \+ member(41, Codes),                 % no parentesi chiuse senza apertura
+    \+ member(40, Codes),                 % no parentesi aperte
+    \+ member(41, Codes),                 % no parentesi chiuse
     validate_id44_segment(Codes, Id44).
 
 % Validazione più stringente per id44

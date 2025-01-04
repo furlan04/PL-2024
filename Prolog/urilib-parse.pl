@@ -534,7 +534,7 @@ parse_id8([C | Codes], Id8) :-
     Id8 = [C | I].
 id8([C1, C2 | Codes], Id8) :-
     C1 = 40, % (
-    is_alnum(C2),
+    is_alpha(C2),
     !,
     parse_id8([C2 | Codes], Id8).
 

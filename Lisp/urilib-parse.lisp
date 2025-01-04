@@ -68,14 +68,13 @@
    (let
        (
         (scheme  (coerce (extract-scheme (coerce uri 'list)) 'string))
-        (authority (if (isSpecial  (coerce (extract-scheme (coerce uri 'list)) 'string)) 
-                       NIL 
-                     (if (check-slashes after) 
-                         (extract-authority (rest(rest after)))
-                       (error "double / expected")
-                       )
-                     )
-                   ) 
+        (authority
+         (cond
+          ((isSpecial (coerce (extract-scheme (coerce uri 'list)) 'string)) NIL)
+          ((check-slashes after) (extract-authority (rest (rest after))))
+          ((check-path-slashes after) NIL)
+          (T (error "invalid URI"))))
+        
         )
      ( 
       if (isSpecial scheme)
@@ -88,9 +87,15 @@
         :fragment (if (string= (first after) "#") (coerce (extract-query (rest after)) 'string) NIL)
         :userInfo (cond
                    ((contains-char authority "@")
-                    (coerce (extract-userInfo authority) 'string))
+                    (let ((after authority))                        
+                    (coerce (extract-userInfo after) 'string)))
                    (T (defparameter after authority)  NIL))
-        :host (if (equal ( extract-host after) nil)(error "no host specified")(extract-host after) )
+        ;; and authority not null
+        :host (if (and 
+                   (equal (extract-host after) nil)
+                   (not (equal authority nil)))
+                  (error "no host specified")
+                (extract-host after) )
         :port (extract-port after)
         )
        )
@@ -125,6 +130,12 @@
    (string= (first chars) "/")
    (string= (second chars) "/")
    (not (string= (third chars) "/")))
+  )
+
+(defun check-path-slashes (chars) 
+  (and 
+   (string= (first chars) "/")
+   (not( string= (second chars) "/")))
   )
 
 (defun isSpecial (scheme)
@@ -171,7 +182,7 @@
    cond 
    ((null chars) NIL)
    ((string= (first chars) "@") 
-    (defparameter after chars)
+    (defparameter after (rest chars))
     NIL
     )
    (T 
@@ -183,9 +194,9 @@
    )
  )
 
-(defun extract-host (chars)"host")
+(defun extract-host (chars) nil)
 
-(defun extract-port (chars) "placeholder")
+(defun extract-port (chars) "port")
 
 
 (defun extract-path (chars) 

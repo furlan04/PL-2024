@@ -68,6 +68,14 @@
    (let
        (
         (scheme  (coerce (extract-scheme (coerce uri 'list)) 'string))
+        (authority (if (isSpecial  (coerce (extract-scheme (coerce uri 'list)) 'string)) 
+                       NIL 
+                     (if (check-slashes after) 
+                         (extract-authority (rest(rest after)))
+                       (error "double / expected")
+                       )
+                     )
+                   ) 
         )
      ( 
       if (isSpecial scheme)
@@ -75,12 +83,15 @@
        (
         make-uri-struct
         :scheme scheme
-        :userInfo (extract-userInfo after)
-        :host (extract-host after)
+        :path (if (string= (first after) "/") (coerce (extract-path (rest after)) 'string) NIL)
+        :query (if (string= (first after) "?") (coerce (extract-query (rest after)) 'string) NIL)
+        :fragment (if (string= (first after) "#") (coerce (extract-query (rest after)) 'string) NIL)
+        :userInfo (cond
+                   ((contains-char authority "@")
+                    (coerce (extract-userInfo authority) 'string))
+                   (T (defparameter after authority)  NIL))
+        :host (if (equal ( extract-host after) nil)(error "no host specified")(extract-host after) )
         :port (extract-port after)
-        :path (if (string= (first after) "/") (coerce (extract-path (rest after)) 'string) nil)
-        :query (if (string= (first after) "?") (coerce (extract-query (rest after)) 'string) nil)
-        :fragment (if (string= (first after) "#") (coerce (extract-query (rest after)) 'string) nil)
         )
        )
      )
@@ -89,6 +100,32 @@
   )
 
 
+
+(defun extract-authority (chars)
+  (
+   cond 
+   ( (or 
+      (string= (first chars) "/")
+      (string= (first chars) "?")
+      (string= (first chars) "#")) 
+     (defparameter after chars)
+     NIL)
+   ( (null chars)
+     (defparameter after NIL)
+     NIL)   
+   ( T 
+     (append (list (first chars))
+             (extract-authority (rest chars)))
+     )
+   )
+  )
+
+(defun check-slashes (chars) 
+  (and 
+   (string= (first chars) "/")
+   (string= (second chars) "/")
+   (not (string= (third chars) "/")))
+  )
 
 (defun isSpecial (scheme)
   (or (string= scheme "mailto")
@@ -129,9 +166,24 @@
 ;not already implemented functions:
 
 
-(defun extract-userinfo (chars) "placeholder")
+(defun extract-userinfo (chars)
+  (
+   cond 
+   ((null chars) NIL)
+   ((string= (first chars) "@") 
+    (defparameter after chars)
+    NIL
+    )
+   (T 
+    (if (identificatorep (first chars))
+        (append (list (first chars)) (extract-userinfo (rest chars)))
+      (error "invalid userInfo character ~c" (first chars))
+      )
+    )
+   )
+ )
 
-(defun extract-host (chars)"placeholder")
+(defun extract-host (chars)"host")
 
 (defun extract-port (chars) "placeholder")
 
@@ -170,7 +222,7 @@
    (T 
     (if (identificatorep (first chars))
         (append (list (first chars)) (extract-path (rest chars)))
-      (error "invalid path character ~c" (first chars))
+      (error "invalid query character ~c" (first chars))
       )
     )
    )
@@ -183,7 +235,7 @@
    (T 
     (if (identificatorep (first chars))
         (append (list (first chars)) (extract-path (rest chars)))
-      (error "invalid path character ~c" (first chars))
+      (error "invalid fragment character ~c" (first chars))
       )
     )
    )
@@ -241,7 +293,6 @@
                           (coerce (extract-host after) 'string)))
                (port (get-port scheme NIL)))
            (if (or (contains-char after "/")
-                   (contains-char after "@")
                    (contains-char after "#")
                    (contains-char after "?"))
                (error "Non corretto")
@@ -260,7 +311,6 @@
                          (coerce (extract-host after) 'string)))        
                (port (get-port scheme NIL)))
            (if (or (contains-char after "/")
-                   (contains-char after "@")
                    (contains-char after "#")
                    (contains-char after "?"))
                (error "Non corretto")
@@ -278,7 +328,6 @@
                        (coerce (extract-host after) 'string)))        
                (port (get-port scheme NIL)))
            (if (or (contains-char after "/")
-                   (contains-char after "@")
                    (contains-char after "#")
                    (contains-char after "?"))
                (error "Non corretto")

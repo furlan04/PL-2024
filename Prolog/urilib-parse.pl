@@ -1,16 +1,21 @@
-% Main URI Parser
-urilib_parse(URIString, URI) :-
-    atom_string(URIString, String),
-    string_codes(String, Chars),
-    parse_scheme(Chars, [], SchemeChars, Rest),
-    atom_chars(Scheme, SchemeChars),
-    scheme_type(Scheme, Type),
-    parse_by_type(Type, Scheme, Rest, URI).
+uri_parse(URIString, URI) :-
+    string(URIString),
+    atom_codes(URIString, Codes),
+    schema(Codes, SchemaCodes, AfterSchema),
+    atom_codes(Schema, SchemaCodes),
+    parse_uri_with_schema(Schema, AfterSchema, URI).
 
-urilib_display(URI) :-
+%!  uri_display(+URI)
+%!  uri_display(+URI, +Stream)
+%
+%   Metodi di debug per stampare l'URI passato in input sullo stream di
+%   destinazione. Nel caso di uri_display/1 l'URI verrà stampato sullo stream
+%   corrente.
+
+uri_display(URI) :-
     current_output(Stream),
     uri_display(URI, Stream).
-urilib_display(URI, Stream) :-
+uri_display(URI, Stream) :-
     URI = uri(Schema, Userinfo, Host, Port, Path, Query, Fragment),
     format(Stream, 'Schema = ~w\n', [Schema]),
     format(Stream, 'Userinfo = ~w\n', [Userinfo]),
@@ -21,456 +26,576 @@ urilib_display(URI, Stream) :-
     format(Stream, 'Fragment = ~w\n', [Fragment]),
     close(Stream).
 
-% Character Validation Rules
-valid_scheme_char(Code) :-
-    char_type(Code, alpha), !.
-valid_scheme_char(Code) :-
-    char_type(Code, digit), !.
-valid_scheme_char(Code) :-
-    Code = 95.  % underscore
+%!  parse_uri_with_schema(+Schema, +AfterSchema, -URI)
+%
+%   A partire dallo Schema passato in input, tramite l'applicazione delle
+%   regole sintattiche associate vengono estratti i componenti dell'URI
+%   mancanti da ciò che si trova dopo lo Schema, passato come AfterSchema.
 
-valid_identifier_char(Code) :-
-    char_type(Code, alpha), !.
-valid_identifier_char(Code) :-
-    char_type(Code, digit), !.
-valid_identifier_char(Code) :-
-    Code = 95.  % underscore
-
-valid_host_identifier_char(Code) :-
-    char_type(Code, alpha), !.
-valid_host_identifier_char(Code) :-
-    char_type(Code, digit), !.
-valid_host_identifier_char(Code) :-
-    Code = 95, !.  % underscore
-valid_host_identifier_char(Code) :-
-    Code = 45, !.  % hyphen
-valid_host_identifier_char(Code) :-
-    Code = 46.     % dot
-
-% Scheme Type Classification
-scheme_type(zos, special).
-scheme_type(mailto, special).
-scheme_type(news, special).
-scheme_type(tel, special).
-scheme_type(fax, special).
-scheme_type(_, generic).
-
-% Parse based on scheme type
-parse_by_type(special, Scheme, Rest, URI) :-
-    special_scheme_parser(Scheme, Parser),
-    !,  % Cut to prevent fallback to generic parser
-    call(Parser, Rest, URI).
-parse_by_type(generic, Scheme, Rest, URI) :-
-    parse_generic_uri(Scheme, Rest, URI).
-
-
-% Special Scheme Parsers Registry
-special_scheme_parser(zos, parse_zos_uri).
-special_scheme_parser(mailto, parse_mailto_uri).
-special_scheme_parser(news, parse_news_uri).
-special_scheme_parser(tel, parse_tel_uri).
-special_scheme_parser(fax, parse_fax_uri).
-
-% Scheme Parser
-parse_scheme([], _, _, _) :- fail.
-parse_scheme(Chars, [], Scheme, Remainder) :-
-    parse_scheme_chars(Chars, [], SchemeTemp, Remainder),
-    validate_scheme_chars(SchemeTemp),
-    Scheme = SchemeTemp.
-
-parse_scheme_chars([Char|Rest], Acc, Scheme, Remainder) :-
-    (Char = 58 -> % colon found
-        Scheme = Acc,
-        Remainder = Rest
-    ;
-        append(Acc, [Char], NewAcc),
-        parse_scheme_chars(Rest, NewAcc, Scheme, Remainder)
-    ).
-
-validate_scheme_chars([First|Rest]) :-
-    char_type(First, alpha),
-    maplist(valid_scheme_char, Rest).
-
-% Generic URI Parser
-% Generic URI Parser with Path Fix
-parse_generic_uri(Scheme, Rest, uri(Scheme, UserInfo, Host, Port, PathSegments, Query, Fragment)) :-
-    parse_authority(Rest, Scheme, Host, UserInfo, Port, PathCodes),
-    (atom(PathCodes) -> 
-        atom_codes(PathCodes, PathChars)
-    ;
-        PathChars = PathCodes
-    ),
-    % Ensure path starts with /
-    (PathChars = [47|_] -> 
-        FinalPathCodes = PathChars
-    ;
-        FinalPathCodes = [47|PathChars]
-    ),
-    parse_path_query_fragment(FinalPathCodes, PathSegments, Query, Fragment),
-    validate_port(Port, Scheme).
-
-% Authority Parser with Path Codes Fix
-parse_authority([47, 47|Authority], Scheme, Host, UserInfo, Port, Path) :-
-    parse_authority_content(Authority, Scheme, Host, UserInfo, Port, Path), !.
-parse_authority(Path, _, '', [], 0, Path).
-
-parse_authority_content(Authority, Scheme, Host, UserInfo, Port, Path) :-
-    (append(UserInfoChars, [64|HostPortPath], Authority) ->
-        parse_userinfo(UserInfoChars, [], UserInfo),
-        parse_host_port_path(HostPortPath, Scheme, Host, Port, Path)
-    ;
-        parse_host_port_path(Authority, Scheme, Host, Port, Path),
-        UserInfo = []
-    ).
-
-parse_host_port_path(Input, Scheme, Host, Port, Path) :-
-    (append(HostPort, [47|PathChars], Input) ->
-        Path = [47|PathChars],
-        parse_host_port(HostPort, Scheme, Host, Port)
-    ;
-        parse_host_port(Input, Scheme, Host, Port),
-        Path = [47]
-    ).
-
-% Special URI Parser
-parse_mailto_uri(Rest, uri(mailto, UserInfo, Host, 25, [], [], [])) :-
-    parse_mailto_parts(Rest, UserInfo, Host).
-
-parse_news_uri(Rest, uri(news, [], Host, 0, [], [], [])) :-
-    atom_codes(Host, Rest),
-    validate_host(Host).
-
-parse_tel_uri(Rest, uri(tel, [UserInfo], '', 0, [], [], [])) :-
-    parse_userinfo_tel(Rest, [], [UserInfo]).
-
-parse_fax_uri(Rest, uri(fax, [UserInfo], '', 0, [], [], [])) :-
-    parse_userinfo_tel(Rest, [], [UserInfo]).
-
-parse_host_port(Input, Scheme, Host, Port) :-
-    (append(HostChars, [58|PortChars], Input) ->
-        atom_codes(Host, HostChars),
-        number_codes(Port, PortChars)
-    ;
-        atom_codes(Host, Input),
-        default_port(Scheme, Port)
-    ),
-    validate_host(Host).
-
-% Port Validation
-validate_port(0, Scheme) :- !,
-    default_port(Scheme, Port),
-    Port = Port.
-validate_port(Port, _) :-
-    integer(Port),
-    Port > 0,
-    Port < 65536.
-
-% Default Ports
-default_port(http, 80).
-default_port(https, 443).
-default_port(ftp, 21).
-default_port(_, 80).
-
-% Host Validation
-validate_host(Host) :-
-    atom_codes(Host, Codes),
-    (validate_ip_address(Codes) ; validate_domain_name(Codes)).
-
-validate_domain_name(Codes) :-
-    split_host_segments(Codes, Segments),
-    maplist(validate_host_identifier, Segments),
-    \+ (append(_, [46,46|_], Codes)).  % No consecutive dots
-
-validate_host_identifier([First|Rest]) :-
-    char_type(First, alpha),
-    maplist(valid_host_identifier_char, Rest).
-
-split_host_segments(Codes, Segments) :-
-    split_by_dot(Codes, [], [], Segments).
-
-split_by_dot([], CurrAcc, Acc, FinalSegments) :-
-    (CurrAcc = [] -> 
-        reverse(Acc, FinalSegments)
-    ;
-        reverse([CurrAcc|Acc], FinalSegments)
-    ).
-split_by_dot([46|Rest], CurrAcc, Acc, Segments) :- % dot
-    CurrAcc \= [],
-    split_by_dot(Rest, [], [CurrAcc|Acc], Segments).
-split_by_dot([Code|Rest], CurrAcc, Acc, Segments) :-
-    append(CurrAcc, [Code], NewAcc),
-    split_by_dot(Rest, NewAcc, Acc, Segments).
-
-validate_ip_address(Codes) :-
-    split_ip_segments(Codes, [], Segments),
-    length(Segments, 4),
-    maplist(validate_ip_segment, Segments).
-
-% IP Address Handling
-split_ip_segments([], CurrAcc, [LastSegment]) :-
-    CurrAcc \= [],
-    reverse(CurrAcc, NumCodes),
-    number_codes(LastSegment, NumCodes).
-split_ip_segments([46|Rest], CurrAcc, [Segment|Segments]) :- % dot
-    CurrAcc \= [],
-    reverse(CurrAcc, NumCodes),
-    number_codes(Segment, NumCodes),
-    split_ip_segments(Rest, [], Segments).
-split_ip_segments([Digit|Rest], CurrAcc, Segments) :-
-    char_type(Digit, digit),
-    split_ip_segments(Rest, [Digit|CurrAcc], Segments).
-
-validate_ip_segment(Segment) :-
-    integer(Segment),
-    Segment >= 0,
-    Segment =< 255.
-
-% Domain Name Validation
-validate_domain_chars([]).
-validate_domain_chars([Char|Rest]) :-
-    (char_type(Char, alnum) ; Char = 45 ; Char = 46), % alphanumeric, hyphen, dot
-    validate_domain_chars(Rest).
-
-% User Info Parser
-parse_userinfo([], Acc, [UserInfo]) :-
-    validate_userinfo_chars(Acc),
-    atom_codes(UserInfo, Acc).
-parse_userinfo([Char|Rest], Acc, UserInfo) :-
-    valid_identifier_char(Char),
-    append(Acc, [Char], NewAcc),
-    parse_userinfo(Rest, NewAcc, UserInfo).
-
-validate_userinfo_chars(Chars) :-
-    maplist(valid_identifier_char, Chars).
-
-% Tel/Fax User Info Parser
-parse_userinfo_tel([], Acc, [UserInfo]) :-
-    atom_codes(UserInfo, Acc).
-parse_userinfo_tel([Char|Rest], Acc, UserInfo) :-
-    append(Acc, [Char], NewAcc),
-    parse_userinfo_tel(Rest, NewAcc, UserInfo).
-
-% Mailto Parser
-parse_mailto_parts(Chars, UserInfo, Host) :-
-    (append(BeforeAt, [64|HostPart], Chars) ->
-        atom_codes(Host, HostPart),
-        validate_host(Host),
-        parse_userinfo(BeforeAt, [], UserInfo)
-    ;
-        parse_userinfo(Chars, [], UserInfo),
-        Host = ''
-    ).
-
-% Path, Query and Fragment Parser
-parse_path_query_fragment(PathCodes, PathSegments, Query, Fragment) :-
-    split_path_query_fragment(PathCodes, PathOnly, QueryCodes, FragmentCodes),
-    decode_path_segments(PathOnly, PathSegments),
-    decode_query(QueryCodes, Query),
-    decode_fragment(FragmentCodes, Fragment).
-
-split_path_query_fragment(Codes, PathCodes, QueryCodes, FragmentCodes) :-
-    split_at(Codes, 35, BeforeHash, FragmentCodes),  % split at #
-    split_at(BeforeHash, 63, PathCodes, QueryCodes). % split at ?
-
-split_at(Codes, Char, Before, After) :-
-    (append(Before, [Char|After], Codes) -> true
-    ; Before = Codes, After = []).
-
-% Path Segments Parser
-decode_path_segments(PathCodes, Segments) :-
-    (PathCodes = [] -> 
-        Segments = []
-    ; PathCodes = [47|Rest] ->  % starts with /
-        (Rest = [] -> 
-            Segments = []
-        ;
-            split_segments(Rest, [], [], ReversedSegments),
-            reverse(ReversedSegments, RawSegments),
-            validate_path_segments(RawSegments),
-            maplist(atom_codes, Segments, RawSegments)
-        )
-    ;
-        split_segments(PathCodes, [], [], ReversedSegments),
-        reverse(ReversedSegments, RawSegments),
-        validate_path_segments(RawSegments),
-        maplist(atom_codes, Segments, RawSegments)
-    ).
-
-% Validate each segment is non-empty and contains only valid characters
-validate_path_segments([]).
-validate_path_segments([Segment|Rest]) :-
-    Segment \= [],  % reject empty segments
-    maplist(valid_path_char, Segment),
-    validate_path_segments(Rest).
-
-% Valid path characters (excluding special characters)
-valid_path_char(Code) :-
-    char_type(Code, alnum), !;  % letters and numbers
-    Code = 45, !;  % hyphen
-    Code = 95.     % underscore
-
-split_segments([], [], Acc, Acc).
-split_segments([], CurrAcc, Acc, [Segment|Acc]) :-
-    decode_percent_encoded(CurrAcc, DecodedCodes),
-    DecodedCodes \= [],  % reject empty segments
-    maplist(valid_path_char, DecodedCodes),
-    Segment = DecodedCodes.
-split_segments([47|Rest], CurrAcc, Acc, Segments) :- % /
-    decode_percent_encoded(CurrAcc, DecodedCodes),
-    DecodedCodes \= [],  % reject empty segments
-    maplist(valid_path_char, DecodedCodes),
-    split_segments(Rest, [], [DecodedCodes|Acc], Segments).
-split_segments([Code|Rest], CurrAcc, Acc, Segments) :-
-    append(CurrAcc, [Code], NewAcc),
-    split_segments(Rest, NewAcc, Acc, Segments).
-
-validate_path_segment(Codes) :-
-    maplist(valid_path_char, Codes).
-
-parse_zos_uri(Rest, uri(zos, UserInfo, Host, Port, PathSegments, [], [])) :-
-
-    parse_authority(Rest, zos, Host, UserInfo, Port, PathCodes),
+%   Uno Schema seguito dal nulla è un URI valido.
+parse_uri_with_schema(Schema, [], URI) :-
     !,
-    % Usa il parser specializzato per il path ZOS
-    parse_zos_path(PathCodes, PathSegments).
+    URI = uri(Schema, [], [], 80, [], [], []).
 
-% Parser dedicato per il path ZOS
-parse_zos_path([], _) :- fail.  % Rifiuta path vuoto
-parse_zos_path([47|Rest], PathSegments) :- % Se inizia con /, processa il resto
+%   Parse di un URI senza Fragment secondo il formato dello Schema zos.
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    Schema = 'zos',
+    authority(AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    path(AfterAuthority, PathCodes, AfterPath),
+    zos_path(PathCodes),
+    query(AfterPath, QueryCodes, []),
     !,
-    split_and_validate_zos_segments(Rest, PathSegments).
-parse_zos_path(PathCodes, PathSegments) :- % Se non inizia con /, processa tutto
-    split_and_validate_zos_segments(PathCodes, PathSegments).
+    atom_codes(Path, PathCodes),
+    atom_codes(Query, QueryCodes),
+    URI = uri(Schema, Userinfo, Host, Port, Path, Query, []).
 
-% Gestisce sia id44(id8) che solo id44
-split_and_validate_zos_segments(Codes, [Id44, Id8]) :-
-    % Prova a splittare su parentesi
-    append(Id44Codes, [40|Rest], Codes),  % split su (
-    append(Id8Codes, [41|[]], Rest),      % deve finire con )
-    validate_id44_segment(Id44Codes, Id44),
-    validate_id8_segment(Id8Codes, Id8),
+%   Parse di un URI senza Query secondo il formato dello Schema zos.
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    Schema = 'zos',
+    authority(AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    path(AfterAuthority, PathCodes, AfterPath),
+    zos_path(PathCodes),
+    fragment(AfterPath, FragmentCodes, []),
+    !,
+    atom_codes(Path, PathCodes),
+    atom_codes(Fragment, FragmentCodes),
+    URI = uri(Schema, Userinfo, Host, Port, Path, [], Fragment).
+
+%   Parse di un URI senza Query e Fragment secondo il formato dello Schema zos.
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    Schema = 'zos',
+    authority(AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    path(AfterAuthority, PathCodes, []),
+    zos_path(PathCodes),
+    !,
+    atom_codes(Path, PathCodes),
+    URI = uri(Schema, Userinfo, Host, Port, Path, [], []).
+
+%   Parse di un URI completo secondo il formato dello Schema zos.
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    Schema = 'zos',
+    !,
+    authority(AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    path(AfterAuthority, PathCodes, AfterPath),
+    zos_path(PathCodes),
+    query(AfterPath, QueryCodes, AfterQuery),
+    fragment(AfterQuery, FragmentCodes, []),
+    atom_codes(Path, PathCodes),
+    atom_codes(Query, QueryCodes),
+    atom_codes(Fragment, FragmentCodes),
+    URI = uri(Schema, Userinfo, Host, Port, Path, Query, Fragment).
+
+%   Parse di un URI senza Path secondo il formato generico.
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    authority(AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    path(AfterAuthority, [], AfterPath),
+    query(AfterPath, QueryCodes, AfterQuery),
+    fragment(AfterQuery, FragmentCodes, []),
+    !,
+    atom_codes(Query, QueryCodes),
+    atom_codes(Fragment, FragmentCodes),
+    URI = uri(Schema, Userinfo, Host, Port, [], Query, Fragment).
+
+%   Parse di un URI senza Fragment secondo il formato generico.
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    authority(AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    path(AfterAuthority, PathCodes, AfterPath),
+    query(AfterPath, QueryCodes, []),
+    !,
+    atom_codes(Path, PathCodes),
+    atom_codes(Query, QueryCodes),
+    URI = uri(Schema, Userinfo, Host, Port, Path, Query, []).
+
+%   Parse di un URI senza Query secondo il formato generico.
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    authority(AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    path(AfterAuthority, PathCodes, AfterPath),
+    fragment(AfterPath, FragmentCodes, []),
+    !,
+    atom_codes(Path, PathCodes),
+    atom_codes(Fragment, FragmentCodes),
+    URI = uri(Schema, Userinfo, Host, Port, Path, [], Fragment).
+
+%   Parse di un URI senza Query e Fragment secondo il formato generico.
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    authority(AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    path(AfterAuthority, PathCodes, []),
+    !,
+    atom_codes(Path, PathCodes),
+    URI = uri(Schema, Userinfo, Host, Port, Path, [], []).
+
+%   Parse di un URI senza Path e Fragment secondo il formato generico.
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    authority(AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    path(AfterAuthority, [], AfterPath),
+    query(AfterPath, QueryCodes, []),
+    !,
+    atom_codes(Query, QueryCodes),
+    URI = uri(Schema, Userinfo, Host, Port, [], Query, []).
+
+%   Parse di un URI senza Path e Query secondo il formato generico.
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    authority(AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    path(AfterAuthority, [], AfterPath),
+    fragment(AfterPath, FragmentCodes, []),
+    !,
+    atom_codes(Fragment, FragmentCodes),
+    URI = uri(Schema, Userinfo, Host, Port, [], [], Fragment).
+
+%   Parse di un URI senza Path, Query e Fragment secondo il formato generico,
+%   terminato dal carattere "/".
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    authority(AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    path(AfterAuthority, [], []),
+    !,
+    URI = uri(Schema, Userinfo, Host, Port, [], [], []).
+
+%   Parse di un URI senza Path, Query e Fragment secondo il formato generico.
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    authority(AfterSchema, Userinfo, Host, Port, []),
+    !,
+    URI = uri(Schema, Userinfo, Host, Port, [], [], []).
+
+%   Parse di un URI completo secondo il formato generico.
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    authority(AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    path(AfterAuthority, PathCodes, AfterPath),
+    query(AfterPath, QueryCodes, AfterQuery),
+    fragment(AfterQuery, FragmentCodes, []),
+    !,
+    atom_codes(Path, PathCodes),
+    atom_codes(Query, QueryCodes),
+    atom_codes(Fragment, FragmentCodes),
+    URI = uri(Schema, Userinfo, Host, Port, Path, Query, Fragment).
+
+%   Parse di un URI contenente solo Userinfo secondo il formato dello Schema
+%   mailto.
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    Schema = 'mailto',
+    plain_userinfo(AfterSchema, U, []),
+    !,
+    atom_codes(Userinfo, U),
+    URI = uri('mailto', Userinfo, [], [], [], [], []).
+
+%   Parse di un URI contenente Userinfo e Host secondo il formato dello Schema
+%   mailto.
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    Schema = 'mailto',
+    plain_userinfo(AfterSchema, U, AfterUserinfo),
+    host(AfterUserinfo, H, []),
+    !,
+    atom_codes(Userinfo, U),
+    atom_codes(Host, H),
+    URI = uri('mailto', Userinfo, Host, [], [], [], []).
+
+%   Parse di un URI contenente solo l'Host secondo il formato dello Schema news.
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    Schema = 'news',
+    host(AfterSchema, H, []),
+    !,
+    atom_codes(Host, H),
+    URI = uri('news', [], Host, [], [], [], []).
+
+%   Parse di un URI contenente solo Userinfo secondo il formato degli Schema
+%   tel e fax.
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    (Schema = 'tel';
+     Schema = 'fax'),
+    plain_userinfo(AfterSchema, U, []),
+    !,
+    atom_codes(Userinfo, U),
+    URI = uri(Schema, Userinfo, [], [], [], [], []).
+
+%!  schema(+Codes, -Schema, -After)
+%
+%   Lo Schema viene estratto dai codici passati in input.
+
+schema([C | Codes], Schema, After) :-
+    C = 58, % :
+    !,
+    Schema = [],
+    After = Codes.
+schema([C | Codes], Schema, After) :-
+    identificatore(C),
+    !,
+    schema(Codes, S, After),
+    Schema = [C | S].
+
+%!  authority(+Codes, -Userinfo, -Host, -Port, -After)
+%
+%   I componenti dell'Authority vengono estratti dai codici passati in input.
+
+%   Parse di Authority completa.
+authority([C1, C2 | Chars], Userinfo, Host, Port, After) :-
+    C1 = 47, % /
+    C2 = 47, % /
+    userinfo(Chars, U, AfterUserinfo),
+    (ip(AfterUserinfo, H, AfterHost);
+     host(AfterUserinfo, H, AfterHost)),
+    port(AfterHost, P, After),
+    !,
+    atom_codes(Userinfo, U),
+    atom_codes(Host, H),
+    number_codes(Port, P).
+
+%   Parse di Authority senza Userinfo.
+authority([C1, C2 | Chars], Userinfo, Host, Port, After) :-
+    C1 = 47, % /
+    C2 = 47, % /
+    (ip(Chars, H, AfterHost);
+     host(Chars, H, AfterHost)),
+    port(AfterHost, P, After),
+    !,
+    Userinfo = [],
+    atom_codes(Host, H),
+    number_codes(Port, P).
+
+%   Parse di Authority senza Port, sostituita quindi da quella di default.
+authority([C1, C2 | Chars], Userinfo, Host, Port, After) :-
+    C1 = 47, % /
+    C2 = 47, % /
+    userinfo(Chars, U, AfterUserinfo),
+    (ip(AfterUserinfo, H, After);
+     host(AfterUserinfo, H, After)),
+    !,
+    atom_codes(Userinfo, U),
+    atom_codes(Host, H),
+    Port = 80.
+
+%   Parse di Authority senza Userinfo e Port. La Port viene sostituita quindi
+%   con quella di default.
+authority([C1, C2 | Chars], Userinfo, Host, Port, After) :-
+    C1 = 47, % /
+    C2 = 47, % /
+    (ip(Chars, H, After);
+     host(Chars, H, After)),
+    !,
+    Userinfo = [],
+    atom_codes(Host, H),
+    Port = 80.
+
+%   Parse di Authority non presente, quindi si passa direttamente al Path.
+authority([C1, C2 | Chars], Userinfo, Host, Port, After) :-
+    C1 = 47,  % /
+    C2 \= 47, % /
+    !,
+    Userinfo = [],
+    Host = [],
+    Port = 80,
+    After = [C1, C2 | Chars].
+
+%!  userinfo(+Codes, -Userinfo, -After)
+%
+%   Lo Userinfo viene estratto dai codici passati in input.
+
+userinfo([C | Codes], Userinfo, After) :-
+    C = 64, % @
+    !,
+    Userinfo = [],
+    After = Codes.
+userinfo([C | Codes], Userinfo, After) :-
+    identificatore(C),
+    !,
+    userinfo(Codes, U, After),
+    Userinfo = [C | U].
+
+%!  plain_userinfo(+Codes, -Userinfo, -After)
+%
+%   Lo Userinfo viene estratto dai codici passati in input. In questo caso
+%   lo Userinfo può essere l'unico componente presente all'interno di un URI.
+
+plain_userinfo([], Userinfo, After) :-
+    Userinfo = [],
+    After = [].
+plain_userinfo([C | Codes], Userinfo, After) :-
+    C = 64, % @
+    !,
+    Userinfo = [],
+    After = Codes.
+plain_userinfo([C | Codes], Userinfo, After) :-
+    identificatore(C),
+    !,
+    plain_userinfo(Codes, U, After),
+    Userinfo = [C | U].
+
+%!  host(+Codes, -Host, -After)
+%
+%   L'Host viene estratto dai codici passati in input.
+
+host([], Host, After) :-
+    Host = [],
+    After = [].
+host([C | Codes], Host, After) :-
+    (C = 58;  % :
+     C = 47), % /
+    !,
+    Host = [],
+    After = [C | Codes].
+host([C | Codes], Host, After) :-
+    identificatore(C),
+    !,
+    host(Codes, P, After),
+    Host = [C | P].
+
+%!  ip(+Codes, -Host, -After)
+%
+%   L'Host viene estratto dai codici passati in input, se il formato dell'Host
+%   corrisponde a quello di un indirizzo IP.
+
+ip(Codes, Host, After):-
+    octet(Codes, FirstOctet, [46 | AfterFirstOctet]),
+    octet(AfterFirstOctet, SecondOctet, [46 | AfterSecondOctet]),
+    octet(AfterSecondOctet, ThirdOctet, [46 | AfterThirdOctet]),
+    octet(AfterThirdOctet, FourthOctet, After),
+    append(FirstOctet, [46], FirstAppend),
+    append(SecondOctet, [46], SecondAppend),
+    append(ThirdOctet, [46], ThirdAppend),
+    append(FirstAppend, SecondAppend, FourthAppend),
+    append(FourthAppend, ThirdAppend, FifthAppend),
+    append(FifthAppend, FourthOctet, Host).
+
+%!  octet(+Codes, -Octet, -After)
+%
+%   Vengono estratti e convertiti gli otto bit che compongono un ottetto
+%   dai codici passati in input.
+
+%   Ottetto composto da tre cifre.
+octet([A, B, C | After], Octet, After):-
+    is_digit(A),
+    is_digit(B),
+    is_digit(C),
+    number_codes(Number, [A, B, C]),
+    Number =< 255,
+    Number >= 0,
+    Octet = [A, B, C],
     !.
-split_and_validate_zos_segments(Codes, [Id44]) :-
-    % Caso senza id8
-    \+ member(40, Codes),                 % no (
-    \+ member(41, Codes),                 % no )
-    validate_id44_segment(Codes, Id44).
 
-% Validazione stringente per id44
-validate_id44_segment(Codes, Id44) :-
-    % Controlli di lunghezza
-    length(Codes, Len),
-    Len > 0,
-    Len =< 44,
-    % Deve iniziare con lettera
-    Codes = [First|_],
-    char_type(First, alpha),
-    % Non può finire con punto
-    \+ (append(_, [46], Codes)),
-    % Non può avere punti consecutivi
-    \+ (append(_, [46,46|_], Codes)),
-    % Tutti i caratteri devono essere validi
-    maplist(valid_id44_char, Codes),
-    % Conversione finale
-    atom_codes(Id44, Codes).
+%   Ottetto composto da due cifre.
+octet([A, B | After], Octet, After):-
+    is_digit(A),
+    is_digit(B),
+    number_codes(Number, [A, B]),
+    Number =< 255,
+    Number >= 0,
+    Octet = [A, B],
+    !.
 
-% Validazione stringente per id8
-validate_id8_segment(Codes, Id8) :-
-    % Controlli di lunghezza
-    length(Codes, Len),
-    Len > 0,
-    Len =< 8,
-    % Deve iniziare con lettera
-    Codes = [First|_],
-    char_type(First, alpha),
-    % Solo caratteri validi
-    maplist(valid_id8_char, Codes),
-    % Conversione finale
-    atom_codes(Id8, Codes).
+%   Ottetto composto da una cifra.
+octet([A | After], Octet, After):-
+    is_digit(A),
+    number_codes(Number, [A]),
+    Number =< 255,
+    Number >= 0,
+    Octet = [A],
+    !.
 
-% Caratteri validi per id44
-valid_id44_char(Code) :-
-    char_type(Code, alpha), !;            % lettere
-    char_type(Code, digit), !;            % numeri
-    Code = 46.                            % solo il punto è permesso
+%!  port(+Codes, -Port, -After)
+%
+%   Viene estratta Port dai codici passati in input.
 
-% Caratteri validi per id8 (più restrittivo)
-valid_id8_char(Code) :-
-    char_type(Code, alpha), !;            % solo lettere
-    char_type(Code, digit).               % e numeri
-
-% Decoding Functions
-decode_segment(RawSegment, DecodedSegment) :-
-    atom_codes(RawSegment, Codes),
-    decode_percent_encoded(Codes, DecodedCodes),
-    atom_codes(DecodedSegment, DecodedCodes).
-
-valid_query_char(Code) :-
-    Code \= 35,  % not #
-    Code >= 32,  % printable characters
-    Code =< 126.
-
-valid_fragment_char(Code) :-
-    Code >= 32,  % printable characters
-    Code =< 126.
-
-validate_query_chars(Chars) :-
-    maplist(valid_query_char, Chars).
-
-validate_fragment_chars(Chars) :-
-    maplist(valid_fragment_char, Chars).
-
-decode_query([], []).
-decode_query(Codes, QueryPairs) :-
-    validate_query_chars(Codes),
-    split_query_params(Codes, ParamsList),
-    maplist(decode_query_param, ParamsList, QueryPairs).
-
-decode_fragment([], []).
-decode_fragment(Codes, Fragment) :-
-    validate_fragment_chars(Codes),
-    decode_percent_encoded(Codes, DecodedCodes),
-    atom_codes(Fragment, DecodedCodes).
-
-split_query_params([], []).
-split_query_params(Codes, [Param|Params]) :-
-    append(ParamCodes, [38|Rest], Codes), % split at &
+parse_port([], Port, After) :-
+    Port = [],
+    After = [].
+parse_port([C | Codes], Port, After) :-
+    C = 47, % /
     !,
-    Param = ParamCodes,
-    split_query_params(Rest, Params).
-split_query_params(Codes, [Codes]) :-
-    Codes \= [].
+    Port = [],
+    After = [C | Codes].
+parse_port([C | Codes], Port, After) :-
+    is_digit(C),
+    !,
+    parse_port(Codes, P, After),
+    Port = [C | P].
+port([C | Codes], Port, After) :-
+    C = 58, % :
+    !,
+    parse_port(Codes, Port, After),
+    Port \= [].
 
-decode_query_param(ParamCodes, [Name, Value]) :-
-    (append(NameCodes, [61|ValueCodes], ParamCodes) -> % split at =
-        decode_percent_encoded(NameCodes, DecodedNameCodes),
-        atom_codes(Name, DecodedNameCodes),
-        decode_percent_encoded(ValueCodes, DecodedValueCodes),
-        atom_codes(Value, DecodedValueCodes)
-    ;
-        decode_percent_encoded(ParamCodes, DecodedNameCodes),
-        atom_codes(Name, DecodedNameCodes),
-        Value = ''
-    ).
+%!  path(+Codes, -Path, -After)
+%
+%   Viene estratto il Path dai codici passati in input.
 
-% Percent Encoding Decoder
-decode_percent_encoded([], []).
-decode_percent_encoded([37,H1,H2|Rest], [Char|Decoded]) :- % %
-    hex_char(H1, D1),
-    hex_char(H2, D2),
-    Char is D1 * 16 + D2,
-    decode_percent_encoded(Rest, Decoded).
-decode_percent_encoded([Char|Rest], [Char|Decoded]) :-
-    decode_percent_encoded(Rest, Decoded).
+parse_path([], Path, After) :-
+    Path = [],
+    After = [].
+parse_path([C | Codes], Path, After) :-
+    (C = 63;  % ?
+     C = 35), % #
+    !,
+    Path = [],
+    After = [C | Codes].
+parse_path([C | Codes], Path, After) :-
+    (identificatore(C);
+     C = 47), % /
+    !,
+    parse_path(Codes, P, After),
+    Path = [C | P].
+path([C | Codes], Path, After) :-
+    C = 47, % /
+    !,
+    parse_path(Codes, Path, After).
 
-% Hex Character Decoder
-hex_char(C, D) :-
-    (C >= 48, C =< 57 ->    % 0-9
-        D is C - 48
-    ; C >= 65, C =< 70 ->   % A-F
-        D is C - 55
-    ; C >= 97, C =< 102 ->  % a-f
-        D is C - 87
-    ;
-        throw(error(uri_parse_error('Invalid hex character'), _))
-    ).
+%!  zos_path(+Codes)
+%
+%   Viene estratto il Path dai codici passati in input secondo il formato
+%   dello Schema zos.
+
+%   Parse del Path contenente solo Id44 secondo il formato dello Schema zos.
+zos_path([C | Codes]) :-
+    is_alpha(C),
+    id44([C | Codes], Id44Codes, []),
+    !,
+    length(Id44Codes, Id44Length),
+    Id44Length =< 44,
+    last(Id44Codes, LastId44Character),
+    LastId44Character \= 46.
+
+%   Parse del Path contenente Id44 e Id8 secondo il formato dello Schema zos.
+zos_path([C | Codes]) :-
+    is_alpha(C),
+    id44([C | Codes], Id44Codes, AfterId44Codes),
+    length(Id44Codes, Id44Length),
+    Id44Length =< 44,
+    last(Id44Codes, LastId44Character),
+    LastId44Character \= 46,
+    id8(AfterId44Codes, Id8Codes),
+    length(Id8Codes, Id8Length),
+    Id8Length =< 8.
+
+%!  id44(+Codes, -Id44, -After)
+%
+%   Viene estratto l'Id44 dai codici passati in input che compongono un Path,
+%   secondo il formato dello Schema zos.
+
+id44([], Id44, After) :-
+    Id44 = [],
+    After = [].
+id44([C | Codes], Id44, After) :-
+    C = 40, % (
+    !,
+    Id44 = [],
+    After = [C | Codes].
+id44([C | Codes], Id44, After) :-
+    (is_alnum(C);
+     C = 46), % .
+    !,
+    id44(Codes, I, After),
+    Id44 = [C | I].
+
+%!  id8(+Codes, -Id44, -After)
+%
+%   Viene estratto l'Id8 dai codici passati in input che compongono un Path,
+%   secondo il formato dello Schema zos.
+
+parse_id8([C | []], Id8) :-
+    C = 41, % )
+    !,
+    Id8 = [].
+parse_id8([C | Codes], Id8) :-
+    is_alnum(C),
+    !,
+    parse_id8(Codes, I),
+    Id8 = [C | I].
+id8([C1, C2 | Codes], Id8) :-
+    C1 = 40, % (
+    is_alnum(C2),
+    !,
+    parse_id8([C2 | Codes], Id8).
+
+%!  query(+Codes, -Query, -After)
+%
+%   Viene estratto il componente Query dai codici passati in input.
+
+parse_query([], Query, After) :-
+    Query = [],
+    After = [].
+parse_query([C | Codes], Query, After) :-
+    C = 35, % #
+    !,
+    Query = [],
+    After = [C | Codes].
+parse_query([C | Codes], Query, After) :-
+    caratteri(C),
+    !,
+    parse_query(Codes, Q, After),
+    Query = [C | Q].
+query([C | Codes], Query, After) :-
+    C = 63, % ?
+    !,
+    parse_query(Codes, Query, After).
+
+%!  fragment(+Codes, -Fragment, -After)
+%
+%   Viene estratto il Fragment dai codici passati in input.
+
+parse_fragment([], Fragment, After) :-
+    Fragment = [],
+    After = [].
+parse_fragment([C | Codes], Fragment, After) :-
+    caratteri(C),
+    !,
+    parse_fragment(Codes, F, After),
+    Fragment = [C | F].
+fragment([C | Codes], Fragment, After) :-
+    C = 35, % #
+    !,
+    parse_fragment(Codes, Fragment, After).
+
+%!  caratteri(+Carattere)
+%
+%   Viene stabilito se il carattere passato in input corrisponde ad uno dei
+%   caratteri accettati dalla specifica corrente.
+
+caratteri(C) :-
+    is_alnum(C);
+    C = 32;  % Space
+    C = 45;  % -
+    C = 46;  % .
+    C = 95;  % _
+    C = 126; % ~
+    C = 58;  % :
+    C = 47;  % /
+    C = 63;  % ?
+    C = 35;  % #
+    C = 91;  % [
+    C = 93;  % ]
+    C = 64;  % @
+    C = 33;  % !
+    C = 36;  % $
+    C = 38;  % &
+    C = 39;  % '
+    C = 40;  % (
+    C = 41;  % )
+    C = 42;  % *
+    C = 43;  % +
+    C = 44;  % ,
+    C = 59;  % ;
+    C = 61.  % =
+
+%!  identificatore(+Carattere)
+%
+%   Tramite questo subset di caratteri, usato in alcuni componenti dell'URI,
+%   viene stabilito se il carattere passato in input corrisponde ad uno dei
+%   caratteri accettati dalla specifica corrente.
+
+identificatore(C) :-
+    is_alnum(C);
+    C = 32;  % Space
+    C = 45;  % -
+    C = 46;  % .
+    C = 95;  % _
+    C = 126; % ~
+    C = 91;  % [
+    C = 93;  % ]
+    C = 33;  % !
+    C = 36;  % $
+    C = 38;  % &
+    C = 39;  % '
+    C = 40;  % (
+    C = 41;  % )
+    C = 42;  % *
+    C = 43;  % +
+    C = 44;  % ,
+    C = 59;  % ;
+    C = 61.  % =

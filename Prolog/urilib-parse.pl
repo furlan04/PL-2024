@@ -1,21 +1,14 @@
-uri_parse(URIString, URI) :-
+urilib_parse(URIString, URI) :-
     string(URIString),
     atom_codes(URIString, Codes),
     schema(Codes, SchemaCodes, AfterSchema),
     atom_codes(Schema, SchemaCodes),
     parse_uri_with_schema(Schema, AfterSchema, URI).
 
-%!  uri_display(+URI)
-%!  uri_display(+URI, +Stream)
-%
-%   Metodi di debug per stampare l'URI passato in input sullo stream di
-%   destinazione. Nel caso di uri_display/1 l'URI verrà stampato sullo stream
-%   corrente.
-
-uri_display(URI) :-
+urilib_display(URI) :-
     current_output(Stream),
     uri_display(URI, Stream).
-uri_display(URI, Stream) :-
+urilib_display(URI, Stream) :-
     URI = uri(Schema, Userinfo, Host, Port, Path, Query, Fragment),
     format(Stream, 'Schema = ~w\n', [Schema]),
     format(Stream, 'Userinfo = ~w\n', [Userinfo]),

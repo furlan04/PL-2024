@@ -42,7 +42,7 @@ parse_uri_with_schema(Schema, [], URI) :-
 % ZOS: Path completo con Query e Fragment
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     Schema = 'zos',
-    authority(AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
     path(AfterAuthority, PathCodes, AfterPath),
     zos_path(PathCodes),
     query(AfterPath, QueryCodes, []),
@@ -54,7 +54,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
 %   Parse di un URI senza Query secondo il formato dello Schema zos.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     Schema = 'zos',
-    authority(AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
     path(AfterAuthority, PathCodes, AfterPath),
     zos_path(PathCodes),
     fragment(AfterPath, FragmentCodes, []),
@@ -66,7 +66,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
 %   Parse di un URI senza Query e Fragment secondo il formato dello Schema zos.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     Schema = 'zos',
-    authority(AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
     path(AfterAuthority, PathCodes, []),
     zos_path(PathCodes),
     !,
@@ -77,7 +77,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     Schema = 'zos',
     !,
-    authority(AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
     path(AfterAuthority, PathCodes, AfterPath),
     zos_path(PathCodes),
     query(AfterPath, QueryCodes, AfterQuery),
@@ -91,7 +91,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
 
 % Caso 1: URI completo con path, query e fragment
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
-    authority(AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
     path(AfterAuthority, PathCodes, AfterPath),
     query(AfterPath, QueryCodes, AfterQuery),
     fragment(AfterQuery, FragmentCodes, []),
@@ -103,7 +103,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
 
 % Caso 2: URI con path e query (no fragment)
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
-    authority(AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
     path(AfterAuthority, PathCodes, AfterPath),
     query(AfterPath, QueryCodes, []),
     !,
@@ -113,7 +113,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
 
 % Caso 3: URI con path e fragment (no query)
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
-    authority(AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
     path(AfterAuthority, PathCodes, AfterPath),
     fragment(AfterPath, FragmentCodes, []),
     !,
@@ -123,7 +123,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
 
 % Caso 4: URI con solo path
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
-    authority(AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
     path(AfterAuthority, PathCodes, []),
     !,
     atom_codes(Path, PathCodes),
@@ -131,7 +131,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
 
 % Caso 5: URI senza path ma con query e fragment
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
-    authority(AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
     AfterAuthority = [63 | _],  % inizia con ?
     query(AfterAuthority, QueryCodes, AfterQuery),
     fragment(AfterQuery, FragmentCodes, []),
@@ -142,7 +142,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
 
 % Caso 6: URI senza path ma con query
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
-    authority(AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
     AfterAuthority = [63 | _],  % inizia con ?
     query(AfterAuthority, QueryCodes, []),
     !,
@@ -151,7 +151,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
 
 % Caso 7: URI senza path ma con fragment
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
-    authority(AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
     AfterAuthority = [35 | _],  % inizia con #
     fragment(AfterAuthority, FragmentCodes, []),
     !,
@@ -160,7 +160,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
 
 % Caso 8: URI con solo authority
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
-    authority(AfterSchema, Userinfo, Host, Port, []),
+    authority(Schema, AfterSchema, Userinfo, Host, Port, []),
     !,
     URI = uri(Schema, Userinfo, Host, Port, [], [], []).
 
@@ -232,7 +232,16 @@ schema([C | Codes], Schema, After) :-
 %   I componenti dell'Authority vengono estratti dai codici passati in input.
 
 %   Parse di Authority completa.
-authority([C1, C2 | Chars], Userinfo, Host, Port, After) :-
+
+default_port(http, 80).
+default_port(https, 443).
+default_port(zos, 23).
+default_port(news, 119).
+default_port(mailto, 25).
+default_port(ftp, 21).
+default_port(_, 80).
+
+authority(_, [C1, C2 | Chars], Userinfo, Host, Port, After) :-
     C1 = 47, % /
     C2 = 47, % /
     userinfo(Chars, U, AfterUserinfo),
@@ -246,7 +255,7 @@ authority([C1, C2 | Chars], Userinfo, Host, Port, After) :-
     number_codes(Port, P).
 
 %   Parse di Authority senza Userinfo.
-authority([C1, C2 | Chars], Userinfo, Host, Port, After) :-
+authority(_, [C1, C2 | Chars], Userinfo, Host, Port, After) :-
     C1 = 47, % /
     C2 = 47, % /
     (ip(Chars, H, AfterHost);
@@ -259,7 +268,7 @@ authority([C1, C2 | Chars], Userinfo, Host, Port, After) :-
     number_codes(Port, P).
 
 %   Parse di Authority senza Port, sostituita quindi da quella di default.
-authority([C1, C2 | Chars], Userinfo, Host, Port, After) :-
+authority(Schema, [C1, C2 | Chars], Userinfo, Host, Port, After) :-
     C1 = 47, % /
     C2 = 47, % /
     userinfo(Chars, U, AfterUserinfo),
@@ -269,12 +278,12 @@ authority([C1, C2 | Chars], Userinfo, Host, Port, After) :-
     atom_codes(Userinfo, U),
     atom_codes(Host, H),
     Host \= '',
-    Port = 80.
+    default_port(Schema, Port).
 
 %   Parse di Authority senza Userinfo e Port. La Port viene sostituita quindi
 %   con quella di default. Questo caso gestisce anche quando dopo l'host c'è
 %   direttamente # o ?
-authority([C1, C2 | Chars], Userinfo, Host, Port, After) :-
+authority(Schema, [C1, C2 | Chars], Userinfo, Host, Port, After) :-
     C1 = 47, % /
     C2 = 47, % /
     (ip(Chars, H, After);
@@ -283,34 +292,34 @@ authority([C1, C2 | Chars], Userinfo, Host, Port, After) :-
     Userinfo = [],
     atom_codes(Host, H),
     Host \= '',
-    Port = 80.
+    default_port(Schema, Port).
 
 %   Parse di Authority non presente, quindi si passa direttamente al Path.
-authority([C1, C2 | Chars], Userinfo, Host, Port, After) :-
-    C1 = 47,  % /
-    C2 \= 47, % /
+authority(Schema, [C1, C2 | Chars], Userinfo, Host, Port, After) :-
+    C1 = 47,  
+    C2 \= 47, 
     !,
     Userinfo = [],
     Host = [],
-    Port = 80,
+    default_port(Schema, Port),
     After = [C1, C2 | Chars].
 
-authority([C1, C2 | Chars], Userinfo, Host, Port, After) :-
-    C1 = 35,  % /
-    C2 \= 35, % /
+authority(Schema, [C1, C2 | Chars], Userinfo, Host, Port, After) :-
+    C1 = 35, 
+    C2 \= 35, 
     !,
     Userinfo = [],
     Host = [],
-    Port = 80,
+    default_port(Schema, Port),
     After = [C1, C2 | Chars].
 
-authority([C1, C2 | Chars], Userinfo, Host, Port, After) :-
-    C1 = 63,  % /
-    C2 \= 63, % /
+authority(Schema, [C1, C2 | Chars], Userinfo, Host, Port, After) :-
+    C1 = 63, 
+    C2 \= 63,
     !,
     Userinfo = [],
     Host = [],
-    Port = 80,
+    default_port(Schema, Port),
     After = [C1, C2 | Chars].
 
 %!  userinfo(+Codes, -Userinfo, -After)

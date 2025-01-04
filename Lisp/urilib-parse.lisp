@@ -58,7 +58,6 @@
       (format stream "Fragment: ~13T ~S" (urilib-fragment urilib-struct) )
       (if (not (equal stream T)) (close stream) t)
       )
-    
     )
   )
 
@@ -82,7 +81,9 @@
        (
         make-uri-struct
         :scheme scheme
-        :path (if (string= (first after) "/") (coerce (extract-path (rest after)) 'string) NIL)
+        :path (if (string= scheme "zos")
+                  (if (string= (first after) "/") (coerce (zos-extract-path (rest after)) 'string) NIL)
+                (if (string= (first after) "/") (coerce (extract-path (rest after)) 'string) NIL))
         :query (if (string= (first after) "?") (coerce (extract-query (rest after)) 'string) NIL)
         :fragment (if (string= (first after) "#") (coerce (extract-query (rest after)) 'string) NIL)
         :userInfo (cond
@@ -146,8 +147,7 @@
   (or (string= scheme "mailto")
       (string= scheme "news")
       (string= scheme "tel")
-      (string= scheme "fax")
-      (string= scheme "zos"))
+      (string= scheme "fax"))
   )
 
 ;function that returns the port if is not null, the default port if it is null
@@ -230,6 +230,53 @@
    )
   )
 
+(defun zos-extract-path (chars)
+  (let((zos-path (extract-path chars)))
+    (if (valid-zos-path-p zos-path)
+        zos-path
+      (error "path zos non corretta")))  
+  )
+
+(defun valid-zos-path-p (char-list)
+  (labels ((alphanumeric-char-p (char)
+             (or (alpha-char-p char)
+                 (digit-char-p char)))
+          
+          (valid-id44-char-p (char)
+             (or (alphanumeric-char-p char)
+                 (char= char #\.)))
+          
+          (parse-id8 (chars)
+             (and chars  ; not empty
+                  (char= (first chars) #\()
+                  (let* ((closing-pos (position #\) chars))
+                         (id8-chars (when closing-pos 
+                                    (subseq chars 1 closing-pos))))
+                    (and closing-pos
+                         (= (1+ closing-pos) (length chars))  ; nothing after )
+                         id8-chars
+                         (<= (length id8-chars) 8)
+                         (every #'alphanumeric-char-p id8-chars)))))
+          
+          (find-id8-start (chars)
+             (position #\( chars)))
+    
+    (let* ((id8-start (find-id8-start char-list))
+           (id44-part (if id8-start 
+                         (subseq char-list 0 id8-start)
+                         char-list))
+           (id8-part (when id8-start 
+                      (subseq char-list id8-start))))
+      
+      (and 
+       ;; Check id44 part
+       (<= (length id44-part) 44)
+       (not (null id44-part))  ; at least one char
+       (every #'valid-id44-char-p id44-part)
+       
+       ;; Check optional id8 part if present
+       (or (null id8-part)  ; no id8 part is ok
+           (parse-id8 id8-part))))))
 
 (defun extract-path (chars) 
   (

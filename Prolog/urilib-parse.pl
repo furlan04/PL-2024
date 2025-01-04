@@ -7,6 +7,20 @@ urilib_parse(URIString, URI) :-
     scheme_type(Scheme, Type),
     parse_by_type(Type, Scheme, Rest, URI).
 
+urilib_display(URI) :-
+    current_output(Stream),
+    uri_display(URI, Stream).
+urilib_display(URI, Stream) :-
+    URI = uri(Schema, Userinfo, Host, Port, Path, Query, Fragment),
+    format(Stream, 'Schema = ~w\n', [Schema]),
+    format(Stream, 'Userinfo = ~w\n', [Userinfo]),
+    format(Stream, 'Host = ~w\n', [Host]),
+    format(Stream, 'Port = ~w\n', [Port]),
+    format(Stream, 'Path = ~w\n', [Path]),
+    format(Stream, 'Query = ~w\n', [Query]),
+    format(Stream, 'Fragment = ~w\n', [Fragment]),
+    close(Stream).
+
 % Character Validation Rules
 valid_scheme_char(Code) :-
     char_type(Code, alpha), !.
@@ -44,9 +58,11 @@ scheme_type(_, generic).
 % Parse based on scheme type
 parse_by_type(special, Scheme, Rest, URI) :-
     special_scheme_parser(Scheme, Parser),
+    !,  % Cut to prevent fallback to generic parser
     call(Parser, Rest, URI).
 parse_by_type(generic, Scheme, Rest, URI) :-
     parse_generic_uri(Scheme, Rest, URI).
+
 
 % Special Scheme Parsers Registry
 special_scheme_parser(zos, parse_zos_uri).
@@ -79,7 +95,6 @@ validate_scheme_chars([First|Rest]) :-
 % Generic URI Parser with Path Fix
 parse_generic_uri(Scheme, Rest, uri(Scheme, UserInfo, Host, Port, PathSegments, Query, Fragment)) :-
     parse_authority(Rest, Scheme, Host, UserInfo, Port, PathCodes),
-    % Convert PathCodes to proper format if it's an atom
     (atom(PathCodes) -> 
         atom_codes(PathCodes, PathChars)
     ;
@@ -312,61 +327,65 @@ split_segments([Code|Rest], CurrAcc, Acc, Segments) :-
 validate_path_segment(Codes) :-
     maplist(valid_path_char, Codes).
 
-% ZOS Path Parser
-% Special URI Parsers
-parse_zos_uri(Rest, uri(zos, [], Host, 0, PathSegments, [], [])) :-
-    parse_zos_authority(Rest, Host, PathCodes),
+parse_zos_uri(Rest, uri(zos, UserInfo, Host, Port, PathSegments, [], [])) :-
+
+    parse_authority(Rest, zos, Host, UserInfo, Port, PathCodes),
+    !,
+    % Usa il parser specializzato per il path ZOS
     parse_zos_path(PathCodes, PathSegments).
 
-% Parse ZOS authority section
-parse_zos_authority([47, 47|Authority], Host, PathCodes) :-
-    (append(HostPart, [47|Path], Authority) ->
-        atom_codes(Host, HostPart),
-        validate_host(Host),
-        PathCodes = Path
-    ;
-        atom_codes(Host, Authority),
-        validate_host(Host),
-        PathCodes = []
-    ).
-
-% ZOS Path Parser
-parse_zos_path([], _) :- fail.  % reject empty path
-parse_zos_path(PathCodes, PathSegments) :-
+% Parser dedicato per il path ZOS
+parse_zos_path([], _) :- fail.  % Rifiuta path vuoto
+parse_zos_path([47|Rest], PathSegments) :- % Se inizia con /, processa il resto
+    !,
+    split_and_validate_zos_segments(Rest, PathSegments).
+parse_zos_path(PathCodes, PathSegments) :- % Se non inizia con /, processa tutto
     split_and_validate_zos_segments(PathCodes, PathSegments).
 
-% Gestisce entrambi i casi: id44(id8) e solo id44
+% Gestisce sia id44(id8) che solo id44
 split_and_validate_zos_segments(Codes, [Id44, Id8]) :-
-    append(Id44Codes, [40|Rest], Codes),  % split at (
-    append(Id8Codes, [41|[]], Rest),      % deve terminare con )
+    % Prova a splittare su parentesi
+    append(Id44Codes, [40|Rest], Codes),  % split su (
+    append(Id8Codes, [41|[]], Rest),      % deve finire con )
     validate_id44_segment(Id44Codes, Id44),
     validate_id8_segment(Id8Codes, Id8),
     !.
 split_and_validate_zos_segments(Codes, [Id44]) :-
-    \+ member(40, Codes),                 % no parentesi aperte
-    \+ member(41, Codes),                 % no parentesi chiuse
+    % Caso senza id8
+    \+ member(40, Codes),                 % no (
+    \+ member(41, Codes),                 % no )
     validate_id44_segment(Codes, Id44).
 
-% Validazione più stringente per id44
+% Validazione stringente per id44
 validate_id44_segment(Codes, Id44) :-
+    % Controlli di lunghezza
     length(Codes, Len),
     Len > 0,
     Len =< 44,
+    % Deve iniziare con lettera
     Codes = [First|_],
-    char_type(First, alpha),              % deve iniziare con lettera
-    \+ (append(_, [46], Codes)),          % non può terminare con punto
-    \+ (append(_, [46,46|_], Codes)),     % non può avere punti consecutivi
+    char_type(First, alpha),
+    % Non può finire con punto
+    \+ (append(_, [46], Codes)),
+    % Non può avere punti consecutivi
+    \+ (append(_, [46,46|_], Codes)),
+    % Tutti i caratteri devono essere validi
     maplist(valid_id44_char, Codes),
+    % Conversione finale
     atom_codes(Id44, Codes).
 
-% Validazione più stringente per id8
+% Validazione stringente per id8
 validate_id8_segment(Codes, Id8) :-
+    % Controlli di lunghezza
     length(Codes, Len),
     Len > 0,
     Len =< 8,
+    % Deve iniziare con lettera
     Codes = [First|_],
-    char_type(First, alpha),              % deve iniziare con lettera
+    char_type(First, alpha),
+    % Solo caratteri validi
     maplist(valid_id8_char, Codes),
+    % Conversione finale
     atom_codes(Id8, Codes).
 
 % Caratteri validi per id44
@@ -375,10 +394,10 @@ valid_id44_char(Code) :-
     char_type(Code, digit), !;            % numeri
     Code = 46.                            % solo il punto è permesso
 
-% Caratteri validi per id8 (più restrittivo, solo alfanumerici)
+% Caratteri validi per id8 (più restrittivo)
 valid_id8_char(Code) :-
-    char_type(Code, alpha), !;            % lettere
-    char_type(Code, digit).               % numeri
+    char_type(Code, alpha), !;            % solo lettere
+    char_type(Code, digit).               % e numeri
 
 % Decoding Functions
 decode_segment(RawSegment, DecodedSegment) :-

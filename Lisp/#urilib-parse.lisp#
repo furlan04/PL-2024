@@ -58,7 +58,6 @@
       (format stream "Fragment: ~13T ~S" (urilib-fragment urilib-struct) )
       (if (not (equal stream T)) (close stream) t)
       )
-    
     )
   )
 
@@ -87,16 +86,16 @@
         :fragment (if (string= (first after) "#") (coerce (extract-query (rest after)) 'string) NIL)
         :userInfo (cond
                    ((contains-char authority "@")
-                    (let ((after authority))                        
-                    (coerce (extract-userInfo after) 'string)))
+                    (let ((auth authority))                        
+                    (coerce (extract-userInfo auth) 'string)))
                    (T (defparameter after authority)  NIL))
         ;; and authority not null
-        :host (if (and 
-                   (equal (extract-host after) nil)
-                   (not (equal authority nil)))
-                  (error "no host specified")
-                (extract-host after) )
-        :port (extract-port after)
+        :host (if (not (equal authority nil))
+                  (if (string= (first after) "@")
+                  (check-host (rest after))
+                    (check-host after))              
+                nil)
+        :port (if (string= (first after) ":") (coerce (extract-port (rest after)) 'string) (get-port scheme NIL))
         )
        )
      )
@@ -104,7 +103,11 @@
     )
   )
 
-
+(defun check-host (chars)
+  (if (equal (extract-host chars) nil)
+      (error "no host specified")    
+    (coerce (extract-host chars) 'string))                                    
+  )
 
 (defun extract-authority (chars)
   (
@@ -159,7 +162,7 @@
      ((string-equal scheme "tel") nil)
      ((string-equal scheme "fax") nil)
      ((string-equal scheme "zos") 23)
-     (t nil))))
+     (t 80))))
 
 (defun extract-scheme (chars)
   (cond ((null chars) (error "Schema is not valid"))
@@ -182,7 +185,7 @@
    cond 
    ((null chars) NIL)
    ((string= (first chars) "@") 
-    (defparameter after (rest chars))
+    (defparameter after  chars)
     NIL
     )
    (T 
@@ -194,9 +197,37 @@
    )
  )
 
-(defun extract-host (chars) nil)
+(defun extract-host (chars) 
+  (
+   cond 
+    ((null chars) NIL)
+    ((string= (first chars) ":") 
+     (defparameter after chars)
+     (if (not (contains-at-most-one chars ":")) 
+         (error "uri cannot contain more than 1 port") 
+       NIL
+       )) 
+    (T 
+     (if (identificatorep (first chars))
+         (append (list (first chars)) (extract-host (rest chars)))
+       (error "extract host: invalid host character ~c" (first chars))
+       )
+     )
+    )
+  )
 
-(defun extract-port (chars) "port")
+(defun extract-port (chars)
+  (
+   cond 
+   ((null chars) NIL)
+   (T 
+    (if (identificatorep (first chars))
+        (append (list (first chars)) (extract-port (rest chars)))
+      (error "invalid fragment character ~c" (first chars))
+      )
+    )
+   )
+  )
 
 
 (defun extract-path (chars) 
@@ -206,7 +237,7 @@
     ((or (string= (first chars) "?") (string= (first chars) "#")) 
      (defparameter after chars)
      (if (and (not (contains-at-most-one chars "?")) (not (contains-at-most-one chars "#"))) 
-         (error "uri cannot contain more than 2 queries or fragments") 
+         (error "uri cannot contain more than 1 query or fragment") 
        NIL
        ))
     
@@ -226,7 +257,7 @@
    ((string= (first chars) "#") 
     (defparameter after chars)
     (if (not (contains-at-most-one chars "#")) 
-        (error "uri cannot contain more than 2 fragments") 
+        (error "uri cannot contain more than 1 fragment") 
       NIL
       ))
    
@@ -301,7 +332,7 @@
          (let ((schema scheme)
                (userinfo (coerce (extract-userinfo after) 'string))
                (host  (if (contains-char after "@")
-                          (coerce (extract-host after) 'string)))
+                          (coerce (extract-host (rest after)) 'string)))
                (port (get-port scheme NIL)))
            (if (or (contains-char after "/")
                    (contains-char after "#")

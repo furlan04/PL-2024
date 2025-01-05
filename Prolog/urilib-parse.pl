@@ -7,7 +7,7 @@ urilib_parse(URIString, URI) :-
 
 urilib_display(URI) :-
     current_output(Stream),
-    uri_display(URI, Stream).
+    urilib_display(URI, Stream).
 urilib_display(URI, Stream) :-
     URI = uri(Schema, Userinfo, Host, Port, Path, Query, Fragment),
     format(Stream, 'Schema = ~w\n', [Schema]),
@@ -363,6 +363,7 @@ plain_userinfo([C | Codes], Userinfo, After) :-
 host([], Host, After) :-
     Host = [],
     After = [].
+
 host([C | Codes], Host, After) :-
     (C = 58;  % :
      C = 47;  % /
@@ -371,11 +372,41 @@ host([C | Codes], Host, After) :-
     !,
     Host = [],
     After = [C | Codes].
+
+% Verifichiamo che l'host inizi con una lettera
 host([C | Codes], Host, After) :-
+    is_alpha(C),  % deve iniziare con una lettera
+    !,
+    host_aux(Codes, C, RestHost, After),
+    Host = [C | RestHost].
+
+host_aux([], _, Host, After) :-
+    Host = [],
+    After = [].
+
+host_aux([C | Codes], PrevChar, Host, After) :-
+    (C = 58;  % :
+     C = 47;  % /
+     C = 63;  % ?
+     C = 35), % #
+    !,
+    Host = [],
+    After = [C | Codes].
+
+host_aux([46 | Codes], PrevChar, Host, After) :-  % caso del punto
+    PrevChar \= 46,  % verifica che il carattere precedente non sia un punto
+    Codes = [C2 | Rest],  % prendi il carattere dopo il punto
+    is_alpha(C2),  % deve essere una lettera
+    !,
+    host_aux(Rest, C2, RestHost, After),
+    Host = [46, C2 | RestHost].
+
+host_aux([C | Codes], PrevChar, Host, After) :-
+    C \= 46,  % non è un punto
     identificatore(C),
     !,
-    host(Codes, P, After),
-    Host = [C | P].
+    host_aux(Codes, C, RestHost, After),
+    Host = [C | RestHost].
 
 ip(Codes, Host, After):-
     octet(Codes, FirstOctet, [46 | AfterFirstOctet]),

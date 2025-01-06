@@ -40,6 +40,11 @@ parse_uri_with_schema(Schema, [], URI) :-
 % -- FORMATO ZOS --
 
 % ZOS: Path completo con Query e Fragment
+parse_uri_with_schema(Schema, [], URI) :-
+    !,
+    URI = uri(Schema, [], [], 80, [], [], []).
+
+%   Parse di un URI senza Fragment secondo il formato dello Schema zos.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     Schema = 'zos',
     authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
@@ -87,9 +92,78 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     atom_codes(Fragment, FragmentCodes),
     URI = uri(Schema, Userinfo, Host, Port, Path, Query, Fragment).
 
-% -- FORMATO GENERICO --
+%   Parse di un URI senza Path secondo il formato generico.
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    path(AfterAuthority, [], AfterPath),
+    query(AfterPath, QueryCodes, AfterQuery),
+    fragment(AfterQuery, FragmentCodes, []),
+    !,
+    atom_codes(Query, QueryCodes),
+    atom_codes(Fragment, FragmentCodes),
+    URI = uri(Schema, Userinfo, Host, Port, [], Query, Fragment).
 
-% Caso 1: URI completo con path, query e fragment
+%   Parse di un URI senza Fragment secondo il formato generico.
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    path(AfterAuthority, PathCodes, AfterPath),
+    query(AfterPath, QueryCodes, []),
+    !,
+    atom_codes(Path, PathCodes),
+    atom_codes(Query, QueryCodes),
+    URI = uri(Schema, Userinfo, Host, Port, Path, Query, []).
+
+%   Parse di un URI senza Query secondo il formato generico.
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    path(AfterAuthority, PathCodes, AfterPath),
+    fragment(AfterPath, FragmentCodes, []),
+    !,
+    atom_codes(Path, PathCodes),
+    atom_codes(Fragment, FragmentCodes),
+    URI = uri(Schema, Userinfo, Host, Port, Path, [], Fragment).
+
+%   Parse di un URI senza Query e Fragment secondo il formato generico.
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    path(AfterAuthority, PathCodes, []),
+    !,
+    atom_codes(Path, PathCodes),
+    URI = uri(Schema, Userinfo, Host, Port, Path, [], []).
+
+%   Parse di un URI senza Path e Fragment secondo il formato generico.
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    path(AfterAuthority, [], AfterPath),
+    query(AfterPath, QueryCodes, []),
+    !,
+    atom_codes(Query, QueryCodes),
+    URI = uri(Schema, Userinfo, Host, Port, [], Query, []).
+
+%   Parse di un URI senza Path e Query secondo il formato generico.
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    path(AfterAuthority, [], AfterPath),
+    fragment(AfterPath, FragmentCodes, []),
+    !,
+    atom_codes(Fragment, FragmentCodes),
+    URI = uri(Schema, Userinfo, Host, Port, [], [], Fragment).
+
+%   Parse di un URI senza Path, Query e Fragment secondo il formato generico,
+%   terminato dal carattere "/".
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    path(AfterAuthority, [], []),
+    !,
+    URI = uri(Schema, Userinfo, Host, Port, [], [], []).
+
+%   Parse di un URI senza Path, Query e Fragment secondo il formato generico.
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    !,
+    URI = uri(Schema, Userinfo, Host, Port, [], [], []).
+
+%   Parse di un URI completo secondo il formato generico.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
     path(AfterAuthority, PathCodes, AfterPath),
@@ -101,72 +175,8 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     atom_codes(Fragment, FragmentCodes),
     URI = uri(Schema, Userinfo, Host, Port, Path, Query, Fragment).
 
-% Caso 2: URI con path e query (no fragment)
-parse_uri_with_schema(Schema, AfterSchema, URI) :-
-    authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
-    path(AfterAuthority, PathCodes, AfterPath),
-    query(AfterPath, QueryCodes, []),
-    !,
-    atom_codes(Path, PathCodes),
-    atom_codes(Query, QueryCodes),
-    URI = uri(Schema, Userinfo, Host, Port, Path, Query, []).
-
-% Caso 3: URI con path e fragment (no query)
-parse_uri_with_schema(Schema, AfterSchema, URI) :-
-    authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
-    path(AfterAuthority, PathCodes, AfterPath),
-    fragment(AfterPath, FragmentCodes, []),
-    !,
-    atom_codes(Path, PathCodes),
-    atom_codes(Fragment, FragmentCodes),
-    URI = uri(Schema, Userinfo, Host, Port, Path, [], Fragment).
-
-% Caso 4: URI con solo path
-parse_uri_with_schema(Schema, AfterSchema, URI) :-
-    authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
-    path(AfterAuthority, PathCodes, []),
-    !,
-    atom_codes(Path, PathCodes),
-    URI = uri(Schema, Userinfo, Host, Port, Path, [], []).
-
-% Caso 5: URI senza path ma con query e fragment
-parse_uri_with_schema(Schema, AfterSchema, URI) :-
-    authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
-    AfterAuthority = [63 | _],  % inizia con ?
-    query(AfterAuthority, QueryCodes, AfterQuery),
-    fragment(AfterQuery, FragmentCodes, []),
-    !,
-    atom_codes(Query, QueryCodes),
-    atom_codes(Fragment, FragmentCodes),
-    URI = uri(Schema, Userinfo, Host, Port, [], Query, Fragment).
-
-% Caso 6: URI senza path ma con query
-parse_uri_with_schema(Schema, AfterSchema, URI) :-
-    authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
-    AfterAuthority = [63 | _],  % inizia con ?
-    query(AfterAuthority, QueryCodes, []),
-    !,
-    atom_codes(Query, QueryCodes),
-    URI = uri(Schema, Userinfo, Host, Port, [], Query, []).
-
-% Caso 7: URI senza path ma con fragment
-parse_uri_with_schema(Schema, AfterSchema, URI) :-
-    authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
-    AfterAuthority = [35 | _],  % inizia con #
-    fragment(AfterAuthority, FragmentCodes, []),
-    !,
-    atom_codes(Fragment, FragmentCodes),
-    URI = uri(Schema, Userinfo, Host, Port, [], [], Fragment).
-
-% Caso 8: URI con solo authority
-parse_uri_with_schema(Schema, AfterSchema, URI) :-
-    authority(Schema, AfterSchema, Userinfo, Host, Port, []),
-    !,
-    URI = uri(Schema, Userinfo, Host, Port, [], [], []).
-
-% -- FORMATO MAILTO --
-
-% Mailto: Solo userinfo
+%   Parse di un URI contenente solo Userinfo secondo il formato dello Schema
+%   mailto.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     Schema = 'mailto',
     plain_userinfo(AfterSchema, U, []),
@@ -175,7 +185,8 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     Userinfo \= '',
     URI = uri('mailto', Userinfo, [], [], [], [], []).
 
-% Mailto: Userinfo e host
+%   Parse di un URI contenente Userinfo e Host secondo il formato dello Schema
+%   mailto.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     Schema = 'mailto',
     plain_userinfo(AfterSchema, U, AfterUserinfo),
@@ -186,9 +197,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     atom_codes(Host, H),
     URI = uri('mailto', Userinfo, Host, [], [], [], []).
 
-% -- FORMATO NEWS --
-
-% News: Solo host
+%   Parse di un URI contenente solo l'Host secondo il formato dello Schema news.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     Schema = 'news',
     host(AfterSchema, H, []),
@@ -196,9 +205,8 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     atom_codes(Host, H),
     URI = uri('news', [], Host, [], [], [], []).
 
-% -- FORMATO TEL/FAX --
-
-% Tel/Fax: Solo userinfo
+%   Parse di un URI contenente solo Userinfo secondo il formato degli Schema
+%   tel e fax.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     (Schema = 'tel';
      Schema = 'fax'),

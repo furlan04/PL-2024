@@ -48,7 +48,7 @@ parse_uri_with_schema(Schema, [], URI) :-
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     Schema = 'zos',
     authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
-    path(AfterAuthority, PathCodes, AfterPath),
+    isolate_path(AfterAuthority, PathCodes, AfterPath),
     zos_path(PathCodes),
     query(AfterPath, QueryCodes, []),
     !,
@@ -60,7 +60,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     Schema = 'zos',
     authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
-    path(AfterAuthority, PathCodes, AfterPath),
+    isolate_path(AfterAuthority, PathCodes, AfterPath),
     zos_path(PathCodes),
     fragment(AfterPath, FragmentCodes, []),
     !,
@@ -72,7 +72,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     Schema = 'zos',
     authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
-    path(AfterAuthority, PathCodes, []),
+    isolate_path(AfterAuthority, PathCodes, []),
     zos_path(PathCodes),
     !,
     atom_codes(Path, PathCodes),
@@ -83,7 +83,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     Schema = 'zos',
     !,
     authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
-    path(AfterAuthority, PathCodes, AfterPath),
+    isolate_path(AfterAuthority, PathCodes, AfterPath),
     zos_path(PathCodes),
     query(AfterPath, QueryCodes, AfterQuery),
     fragment(AfterQuery, FragmentCodes, []),
@@ -503,6 +503,16 @@ path_aux([C | Codes], [C | Path], After) :-
 %   dello Schema zos.
 
 %   Parse del Path contenente solo Id44 secondo il formato dello Schema zos.
+
+isolate_path([47 | Codes], Path, After) :-  % /
+    isolate_path_aux(Codes, Path, After).
+
+isolate_path_aux([], [], []).
+isolate_path_aux([63 | Rest], [], [63 | Rest]) :- !.  % ?
+isolate_path_aux([35 | Rest], [], [35 | Rest]) :- !.  % #.
+isolate_path_aux([C | Codes], [C | Path], After) :-
+    isolate_path_aux(Codes, Path, After).
+
 zos_path([C | Codes]) :-
     is_alpha(C),
     id44([C | Codes], Id44Codes, []),
@@ -601,20 +611,14 @@ fragment([C | Codes], Fragment, After) :-
 
 caratteri(C) :-
     is_alnum(C);
-    C = 40;
-    C = 41;
     C = 45;  % -
-    C = 46;  % .
     C = 95;  % _
     C = 43;  % +
     C = 61.  % =
 
 identificatore(C) :-
     is_alnum(C);
-    C = 40;
-    C = 41;
     C = 45;  % -
-    C = 46;  % .
     C = 95;  % _
     C = 43;  % +
     C = 61.  % =

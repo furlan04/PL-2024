@@ -21,18 +21,8 @@ urilib_display(URI, Stream) :-
 
 %!  parse_uri_with_schema(+Schema, +AfterSchema, -URI)
 %
-%   A partire dallo Schema passato in input, tramite l'applicazione delle
-%   regole sintattiche associate vengono estratti i componenti dell'URI
-%   mancanti da ciò che si trova dopo lo Schema, passato come AfterSchema.
 
-%   Uno Schema seguito dal nulla è un URI valido.
-%!  parse_uri_with_schema(+Schema, +AfterSchema, -URI)
-%
-%   A partire dallo Schema passato in input, tramite l'applicazione delle
-%   regole sintattiche associate vengono estratti i componenti dell'URI
-%   mancanti da ciò che si trova dopo lo Schema, passato come AfterSchema.
-
-% Schema seguito dal nulla è un URI valido
+% Schema seguito dal nulla
 parse_uri_with_schema(Schema, [], URI) :-
     !,
     URI = uri(Schema, [], [], 80, [], [], []).
@@ -293,9 +283,7 @@ authority(Schema, [C1, C2 | Chars], Userinfo, Host, Port, After) :-
     Host \= '',
     default_port(Schema, Port).
 
-%   Parse di Authority senza Userinfo e Port. La Port viene sostituita quindi
-%   con quella di default. Questo caso gestisce anche quando dopo l'host c'è
-%   direttamente # o ?
+%   Parse di Authority senza Userinfo e Port.
 authority(Schema, [C1, C2 | Chars], Userinfo, Host, Port, After) :-
     C1 = 47, % /
     C2 = 47, % /
@@ -352,8 +340,7 @@ userinfo([C | Codes], Userinfo, After) :-
 
 %!  plain_userinfo(+Codes, -Userinfo, -After)
 %
-%   Lo Userinfo viene estratto dai codici passati in input. In questo caso
-%   lo Userinfo può essere l'unico componente presente all'interno di un URI.
+%   Lo Userinfo viene estratto dai codici passati in input.
 
 plain_userinfo([], Userinfo, After) :-
     Userinfo = [],
@@ -415,7 +402,7 @@ host_aux([46 | Codes], PrevChar, Host, After) :-  % caso del punto
     Host = [46, C2 | RestHost].
 
 host_aux([C | Codes], _, Host, After) :-
-    C \= 46,  % non è un punto
+    C \= 46,  % non punto
     identificatore(C),
     !,
     host_aux(Codes, C, RestHost, After),

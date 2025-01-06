@@ -162,7 +162,9 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
 
 %   Parse di un URI senza Path, Query e Fragment secondo il formato generico.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
-    authority(Schema, AfterSchema, Userinfo, Host, Port, _),
+    authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    (AfterAuthority = [];
+     AfterAuthority = [47]),
     !,
     URI = uri(Schema, Userinfo, Host, Port, [], [], []).
 

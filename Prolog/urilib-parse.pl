@@ -493,7 +493,7 @@ path_aux([], [], []).
 path_aux([63 | Rest], [], [63 | Rest]) :- !.  % ?
 path_aux([35 | Rest], [], [35 | Rest]) :- !.  % #
 path_aux([C | Codes], [C | Path], After) :-
-    identificatore(C),  % This will fail if C is not a valid character
+    (identificatore(C);C=47),  % This will fail if C is not a valid character
     path_aux(Codes, Path, After).
 %
 %   Viene estratto il Path dai codici passati in input secondo il formato

@@ -109,7 +109,8 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     path(AfterAuthority, PathCodes, AfterPath),
     query(AfterPath, QueryCodes, []),
     !,
-    atom_codes(Path, PathCodes),
+    (PathCodes = [],
+        Path = [] ; atom_codes(Path, PathCodes)),
     atom_codes(Query, QueryCodes),
     URI = uri(Schema, Userinfo, Host, Port, Path, Query, []).
 
@@ -119,7 +120,8 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     path(AfterAuthority, PathCodes, AfterPath),
     fragment(AfterPath, FragmentCodes, []),
     !,
-    atom_codes(Path, PathCodes),
+    (PathCodes = [],
+        Path = [] ; atom_codes(Path, PathCodes)),
     atom_codes(Fragment, FragmentCodes),
     URI = uri(Schema, Userinfo, Host, Port, Path, [], Fragment).
 
@@ -128,7 +130,8 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
     path(AfterAuthority, PathCodes, []),
     !,
-    atom_codes(Path, PathCodes),
+    (PathCodes = [],
+        Path = [] ; atom_codes(Path, PathCodes)),
     URI = uri(Schema, Userinfo, Host, Port, Path, [], []).
 
 %   Parse di un URI senza Path e Fragment secondo il formato generico.
@@ -159,7 +162,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
 
 %   Parse di un URI senza Path, Query e Fragment secondo il formato generico.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
-    authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    authority(Schema, AfterSchema, Userinfo, Host, Port, _),
     !,
     URI = uri(Schema, Userinfo, Host, Port, [], [], []).
 
@@ -392,7 +395,7 @@ host_aux([], _, Host, After) :-
     Host = [],
     After = [].
 
-host_aux([C | Codes], PrevChar, Host, After) :-
+host_aux([C | Codes], _, Host, After) :-
     (C = 58;  % :
      C = 47;  % /
      C = 63;  % ?
@@ -409,7 +412,7 @@ host_aux([46 | Codes], PrevChar, Host, After) :-  % caso del punto
     host_aux(Rest, C2, RestHost, After),
     Host = [46, C2 | RestHost].
 
-host_aux([C | Codes], PrevChar, Host, After) :-
+host_aux([C | Codes], _, Host, After) :-
     C \= 46,  % non è un punto
     identificatore(C),
     !,
@@ -467,50 +470,29 @@ octet([A | After], Octet, After):-
 %
 %   Viene estratta Port dai codici passati in input.
 
-parse_port([], Port, After) :-
-    Port = [],
-    After = [].
-parse_port([C | Codes], Port, After) :-
-    C = 47, % /
-    !,
-    Port = [],
-    After = [C | Codes].
-parse_port([C | Codes], Port, After) :-
+% Port must contain only digits and return false for invalid input
+port([58 | Codes], Port, After) :-  % :
+    port_aux(Codes, Port, After),
+    Port \= [],
+    number_codes(_, Port).
+
+port_aux([], [], []).
+port_aux([47 | Rest], [], [47 | Rest]) :- !.  
+port_aux([63 | Rest], [], [63 | Rest]) :- !.  
+port_aux([35 | Rest], [], [35 | Rest]) :- !.  
+port_aux([C | Codes], [C | Port], After) :-
     is_digit(C),
-    !,
-    parse_port(Codes, P, After),
-    Port = [C | P].
-port([C | Codes], Port, After) :-
-    C = 58, % :
-    !,
-    parse_port(Codes, Port, After),
-    Port \= [].
+    port_aux(Codes, Port, After).
 
-%!  path(+Codes, -Path, -After)
-%
-%   Viene estratto il Path dai codici passati in input.
+path([47 | Codes], Path, After) :-  % /
+    path_aux(Codes, Path, After).
 
-parse_path([], Path, After) :-
-    Path = [],
-    After = [].
-parse_path([C | Codes], Path, After) :-
-    (C = 63;  % ?
-     C = 35), % #
-    !,
-    Path = [],
-    After = [C | Codes].
-parse_path([C | Codes], Path, After) :-
-    (identificatore(C);
-     C = 47), % /
-    !,
-    parse_path(Codes, P, After),
-    Path = [C | P].
-path([C | Codes], Path, After) :-
-    C = 47, % /
-    !,
-    parse_path(Codes, Path, After).
-
-%!  zos_path(+Codes)
+path_aux([], [], []).
+path_aux([63 | Rest], [], [63 | Rest]) :- !.  % ?
+path_aux([35 | Rest], [], [35 | Rest]) :- !.  % #
+path_aux([C | Codes], [C | Path], After) :-
+    identificatore(C),  % This will fail if C is not a valid character
+    path_aux(Codes, Path, After).
 %
 %   Viene estratto il Path dai codici passati in input secondo il formato
 %   dello Schema zos.
@@ -614,47 +596,20 @@ fragment([C | Codes], Fragment, After) :-
 
 caratteri(C) :-
     is_alnum(C);
-    C = 32;  % Space
+    C = 40;
+    C = 41;
     C = 45;  % -
     C = 46;  % .
     C = 95;  % _
-    C = 126; % ~
-    C = 58;  % :
-    C = 47;  % /
-    C = 63;  % ?
-    C = 35;  % #
-    C = 91;  % [
-    C = 93;  % ]
-    C = 64;  % @
-    C = 33;  % !
-    C = 36;  % $
-    C = 38;  % &
-    C = 39;  % '
-    C = 40;  % (
-    C = 41;  % )
-    C = 42;  % *
     C = 43;  % +
-    C = 44;  % ,
-    C = 59;  % ;
     C = 61.  % =
 
 identificatore(C) :-
     is_alnum(C);
-    C = 32;  % Space
+    C = 40;
+    C = 41;
     C = 45;  % -
     C = 46;  % .
     C = 95;  % _
-    C = 126; % ~
-    C = 91;  % [
-    C = 93;  % ]
-    C = 33;  % !
-    C = 36;  % $
-    C = 38;  % &
-    C = 39;  % '
-    C = 40;  % (
-    C = 41;  % )
-    C = 42;  % *
     C = 43;  % +
-    C = 44;  % ,
-    C = 59;  % ;
     C = 61.  % =

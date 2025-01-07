@@ -437,7 +437,6 @@
         ;; Handle the "news" scheme
         ((string= scheme "news")
          (let ((schema scheme)
-               (userinfo (coerce (extract-userinfo after) 'string))
                (host   (if (or (contains-char after "@")
                                (contains-char after ":"))
                            (error "Host non valido")
@@ -450,28 +449,17 @@
                (error "Non corretto")
              (make-uri-struct
               :scheme schema
-              :userinfo userinfo
               :host host
               :port port))))
         ;; Handle the "tel" and "fax" schemes
-        ((or (string= scheme "tel") (string= scheme "fax"))
-         (let ((schema scheme)
-               (userinfo (coerce (extract-userinfo after) 'string))
-               (host (if (or (contains-char after "@"))
-                         (error "Host non valido")
-                       (coerce (extract-host after) 'string)))        
-               (port (get-port scheme NIL)))
-           ;; Raise an error if invalid characters are present
-           (if (or (contains-char after "/")
-                   (contains-char after "#")
-                   (contains-char after "?"))
-               (error "Schema tel/fax non corretto")
+        ((or (string= scheme "tel") (string= scheme "fax"))      
+         (if (every #'digit-char-p after)
              (make-uri-struct
-              :scheme schema
-              :userinfo userinfo
-              :host host
-              :port port))))
-        ))
+              :scheme scheme
+              :userinfo (coerce after 'string)
+              :port (get-port scheme NIL))
+           (error "Schema tel/fax non corretto"))
+        )))
       
 
 ;;; Check if a character is a valid identifier character

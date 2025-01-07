@@ -71,12 +71,12 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
 %   Parse di un URI completo secondo il formato dello Schema zos.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     Schema = 'zos',
-    !,
     authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
     isolate_path(AfterAuthority, PathCodes, AfterPath),
     zos_path(PathCodes),
     query(AfterPath, QueryCodes, AfterQuery),
     fragment(AfterQuery, FragmentCodes, []),
+    !,
     atom_codes(Path, PathCodes),
     atom_codes(Query, QueryCodes),
     atom_codes(Fragment, FragmentCodes),
@@ -84,6 +84,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
 
 %   Parse di un URI senza Path secondo il formato generico.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    generic_scheme(Schema),
     authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
     path(AfterAuthority, [], AfterPath),
     query(AfterPath, QueryCodes, AfterQuery),
@@ -95,6 +96,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
 
 %   Parse di un URI senza Fragment secondo il formato generico.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    generic_scheme(Schema),
     authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
     path(AfterAuthority, PathCodes, AfterPath),
     query(AfterPath, QueryCodes, []),
@@ -106,6 +108,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
 
 %   Parse di un URI senza Query secondo il formato generico.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    generic_scheme(Schema),
     authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
     path(AfterAuthority, PathCodes, AfterPath),
     fragment(AfterPath, FragmentCodes, []),
@@ -117,6 +120,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
 
 %   Parse di un URI senza Query e Fragment secondo il formato generico.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    generic_scheme(Schema),
     authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
     path(AfterAuthority, PathCodes, []),
     !,
@@ -126,6 +130,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
 
 %   Parse di un URI senza Path e Fragment secondo il formato generico.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    generic_scheme(Schema),
     authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
     path(AfterAuthority, [], AfterPath),
     query(AfterPath, QueryCodes, []),
@@ -135,6 +140,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
 
 %   Parse di un URI senza Path e Query secondo il formato generico.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    generic_scheme(Schema),
     authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
     path(AfterAuthority, [], AfterPath),
     fragment(AfterPath, FragmentCodes, []),
@@ -145,6 +151,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
 %   Parse di un URI senza Path, Query e Fragment secondo il formato generico,
 %   terminato dal carattere "/".
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    generic_scheme(Schema),
     authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
     path(AfterAuthority, [], []),
     !,
@@ -160,6 +167,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
 
 %   Parse di un URI completo secondo il formato generico.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    generic_scheme(Schema),
     authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
     path(AfterAuthority, PathCodes, AfterPath),
     query(AfterPath, QueryCodes, AfterQuery),
@@ -609,3 +617,8 @@ identificatore(C) :-
     C = 95;  % _
     C = 43;  % +
     C = 61.  % =
+
+generic_scheme(Schema) :-
+    Schema = 'http';
+    Schema = 'https';
+    Schema = 'ftp'.

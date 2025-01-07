@@ -411,7 +411,7 @@ host_aux([46 | Codes], PrevChar, Host, After) :-  % caso del punto
 
 host_aux([C | Codes], _, Host, After) :-
     C \= 46,  % non punto
-    identificatore(C),
+    is_alnum(C),
     !,
     host_aux(Codes, C, RestHost, After),
     Host = [C | RestHost].
@@ -481,8 +481,9 @@ port_aux([C | Codes], [C | Port], After) :-
     is_digit(C),
     port_aux(Codes, Port, After).
 
-path([47 | Codes], Path, After) :-  % /
-    path_aux(Codes, Path, After).
+path([47, C | Codes], Path, After) :-  % /
+    identificatore(C),
+    path_aux([C | Codes], Path, After).
 
 path_aux([], [], []).
 path_aux([63 | Rest], [], [63 | Rest]) :- !.  % ?

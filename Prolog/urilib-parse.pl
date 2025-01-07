@@ -620,6 +620,8 @@ identificatore(C) :-
     C = 61.  % =
 
 generic_scheme(Schema) :-
-    Schema = 'http';
-    Schema = 'https';
-    Schema = 'ftp'.
+    Schema \= 'zos',
+    Schema \= 'mailto',
+    Schema \= 'tel',
+    Schema \= 'fax',
+    Schema \= 'news'.

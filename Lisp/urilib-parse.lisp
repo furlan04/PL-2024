@@ -470,6 +470,9 @@
       (string= char "+")
       (string= char "-")
       (string= char ".")
+      (string= char "/")
+      (string= char "(")
+      (string= char ")")
       ))
   
 ;;; Check if a character list contains the specified character

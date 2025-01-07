@@ -58,7 +58,6 @@
       (format stream "Fragment: ~13T ~S" (urilib-fragment urilib-struct) )
       (if (not (equal stream T)) (close stream) t)
       )
-    
     )
   )
 
@@ -82,21 +81,23 @@
        (
         make-uri-struct
         :scheme scheme
-        :path (if (string= (first after) "/") (coerce (extract-path (rest after)) 'string) NIL)
+        :path (if (string= scheme "zos")
+                  (if (string= (first after) "/") (coerce (zos-extract-path (rest after)) 'string) NIL)
+                (if (string= (first after) "/") (coerce (extract-path (rest after)) 'string) NIL))
         :query (if (string= (first after) "?") (coerce (extract-query (rest after)) 'string) NIL)
         :fragment (if (string= (first after) "#") (coerce (extract-query (rest after)) 'string) NIL)
         :userInfo (cond
                    ((contains-char authority "@")
-                    (let ((after authority))                        
-                    (coerce (extract-userInfo after) 'string)))
+                    (let ((auth authority))                        
+                    (coerce (extract-userInfo auth) 'string)))
                    (T (defparameter after authority)  NIL))
         ;; and authority not null
-        :host (if (and 
-                   (equal (extract-host after) nil)
-                   (not (equal authority nil)))
-                  (error "no host specified")
-                (extract-host after) )
-        :port (extract-port after)
+        :host (if (not (equal authority nil))
+                  (if (string= (first after) "@")
+                  (check-host (rest after))
+                    (check-host after))              
+                nil)
+        :port (if (string= (first after) ":") (coerce (extract-port (rest after)) 'string) (get-port scheme NIL))
         )
        )
      )
@@ -104,7 +105,11 @@
     )
   )
 
-
+(defun check-host (chars)
+  (if (equal (extract-host chars) nil)
+      (error "no host specified")    
+    (coerce (extract-host chars) 'string))                                    
+  )
 
 (defun extract-authority (chars)
   (
@@ -142,8 +147,7 @@
   (or (string= scheme "mailto")
       (string= scheme "news")
       (string= scheme "tel")
-      (string= scheme "fax")
-      (string= scheme "zos"))
+      (string= scheme "fax"))
   )
 
 ;function that returns the port if is not null, the default port if it is null
@@ -159,7 +163,7 @@
      ((string-equal scheme "tel") nil)
      ((string-equal scheme "fax") nil)
      ((string-equal scheme "zos") 23)
-     (t nil))))
+     (t 80))))
 
 (defun extract-scheme (chars)
   (cond ((null chars) (error "Schema is not valid"))
@@ -182,7 +186,7 @@
    cond 
    ((null chars) NIL)
    ((string= (first chars) "@") 
-    (defparameter after (rest chars))
+    (defparameter after  chars)
     NIL
     )
    (T 
@@ -194,10 +198,85 @@
    )
  )
 
-(defun extract-host (chars) nil)
+(defun extract-host (chars) 
+  (
+   cond 
+    ((null chars) NIL)
+    ((string= (first chars) ":") 
+     (defparameter after chars)
+     (if (not (contains-at-most-one chars ":")) 
+         (error "uri cannot contain more than 1 port") 
+       NIL
+       )) 
+    (T 
+     (if (identificatorep (first chars))
+         (append (list (first chars)) (extract-host (rest chars)))
+       (error "extract host: invalid host character ~c" (first chars))
+       )
+     )
+    )
+  )
 
-(defun extract-port (chars) "port")
+(defun extract-port (chars)
+  (
+   cond 
+   ((null chars) NIL)
+   (T 
+    (if (identificatorep (first chars))
+        (append (list (first chars)) (extract-port (rest chars)))
+      (error "invalid fragment character ~c" (first chars))
+      )
+    )
+   )
+  )
 
+(defun zos-extract-path (chars)
+  (let((zos-path (extract-path chars)))
+    (if (valid-zos-path-p zos-path)
+        zos-path
+      (error "path zos non corretta")))  
+  )
+
+(defun valid-zos-path-p (char-list)
+  (labels ((alphanumeric-char-p (char)
+             (or (alpha-char-p char)
+                 (digit-char-p char)))
+          
+          (valid-id44-char-p (char)
+             (or (alphanumeric-char-p char)
+                 (char= char #\.)))
+          
+          (parse-id8 (chars)
+             (and chars  ; not empty
+                  (char= (first chars) #\()
+                  (let* ((closing-pos (position #\) chars))
+                         (id8-chars (when closing-pos 
+                                    (subseq chars 1 closing-pos))))
+                    (and closing-pos
+                         (= (1+ closing-pos) (length chars))  ; nothing after )
+                         id8-chars
+                         (<= (length id8-chars) 8)
+                         (every #'alphanumeric-char-p id8-chars)))))
+          
+          (find-id8-start (chars)
+             (position #\( chars)))
+    
+    (let* ((id8-start (find-id8-start char-list))
+           (id44-part (if id8-start 
+                         (subseq char-list 0 id8-start)
+                         char-list))
+           (id8-part (when id8-start 
+                      (subseq char-list id8-start))))
+      
+      (and 
+       ;; Check id44 part
+       (<= (length id44-part) 44)
+       (not (null id44-part))  ; at least one char
+       (every #'valid-id44-char-p id44-part)
+       
+       ;; Check optional id8 part if present
+       (or (null id8-part)  ; no id8 part is ok
+           (parse-id8 id8-part))))))
 
 (defun extract-path (chars) 
   (
@@ -206,7 +285,7 @@
     ((or (string= (first chars) "?") (string= (first chars) "#")) 
      (defparameter after chars)
      (if (and (not (contains-at-most-one chars "?")) (not (contains-at-most-one chars "#"))) 
-         (error "uri cannot contain more than 2 queries or fragments") 
+         (error "uri cannot contain more than 1 query or fragment") 
        NIL
        ))
     
@@ -226,7 +305,7 @@
    ((string= (first chars) "#") 
     (defparameter after chars)
     (if (not (contains-at-most-one chars "#")) 
-        (error "uri cannot contain more than 2 fragments") 
+        (error "uri cannot contain more than 1 fragment") 
       NIL
       ))
    
@@ -301,7 +380,7 @@
          (let ((schema scheme)
                (userinfo (coerce (extract-userinfo after) 'string))
                (host  (if (contains-char after "@")
-                          (coerce (extract-host after) 'string)))
+                          (coerce (extract-host (rest after)) 'string)))
                (port (get-port scheme NIL)))
            (if (or (contains-char after "/")
                    (contains-char after "#")

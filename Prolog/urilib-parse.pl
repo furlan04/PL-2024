@@ -252,12 +252,17 @@ default_port(mailto, 25).
 default_port(ftp, 21).
 default_port(_, 80).
 
+ip_or_host(Chars, H, AfterHost) :-
+    ip(Chars, H, AfterHost).
+
+ip_or_host(Chars, H, AfterHost) :-
+    host(Chars, H, AfterHost).
+
 authority(_, [C1, C2 | Chars], Userinfo, Host, Port, After) :-
     C1 = 47, % /
     C2 = 47, % /
     userinfo(Chars, U, AfterUserinfo),
-    (ip(AfterUserinfo, H, AfterHost);
-     host(AfterUserinfo, H, AfterHost)),
+    ip_or_host(AfterUserinfo, H, AfterHost),
     port(AfterHost, P, After),
     !,
     atom_codes(Userinfo, U),
@@ -269,8 +274,7 @@ authority(_, [C1, C2 | Chars], Userinfo, Host, Port, After) :-
 authority(_, [C1, C2 | Chars], Userinfo, Host, Port, After) :-
     C1 = 47, % /
     C2 = 47, % /
-    (ip(Chars, H, AfterHost);
-     host(Chars, H, AfterHost)),
+    ip_or_host(Chars, H, AfterHost),
     port(AfterHost, P, After),
     !,
     Userinfo = [],
@@ -283,8 +287,7 @@ authority(Schema, [C1, C2 | Chars], Userinfo, Host, Port, After) :-
     C1 = 47, % /
     C2 = 47, % /
     userinfo(Chars, U, AfterUserinfo),
-    (ip(AfterUserinfo, H, After);
-     host(AfterUserinfo, H, After)),
+    ip_or_host(AfterUserinfo, H, After),
     !,
     atom_codes(Userinfo, U),
     atom_codes(Host, H),
@@ -295,8 +298,7 @@ authority(Schema, [C1, C2 | Chars], Userinfo, Host, Port, After) :-
 authority(Schema, [C1, C2 | Chars], Userinfo, Host, Port, After) :-
     C1 = 47, % /
     C2 = 47, % /
-    (ip(Chars, H, After);
-     host(Chars, H, After)),
+    ip_or_host(Chars, H, After),
     !,
     Userinfo = [],
     atom_codes(Host, H),
@@ -368,15 +370,21 @@ plain_userinfo([C | Codes], Userinfo, After) :-
 %
 %   L'Host viene estratto dai codici passati in input.
 
+special_char(C) :-
+    C = 58.
+special_char(C) :-
+    C = 47.
+special_char(C) :-
+    C = 63.
+special_char(C) :-
+    C = 35.
+
 host([], Host, After) :-
     Host = [],
     After = [].
 
 host([C | Codes], Host, After) :-
-    (C = 58;  % :
-     C = 47;  % /
-     C = 63;  % ?
-     C = 35), % #
+    special_char(C),
     !,
     Host = [],
     After = [C | Codes].
@@ -393,10 +401,7 @@ host_aux([], _, Host, After) :-
     After = [].
 
 host_aux([C | Codes], _, Host, After) :-
-    (C = 58;  % :
-     C = 47;  % /
-     C = 63;  % ?
-     C = 35), % #
+    special_char(C),
     !,
     Host = [],
     After = [C | Codes].
@@ -481,8 +486,15 @@ port_aux([C | Codes], [C | Port], After) :-
     is_digit(C),
     port_aux(Codes, Port, After).
 
+path_accettati_secondo_char(C) :-
+    identificatore(C).
+path_accettati_secondo_char(C) :-
+    C = 63.
+path_accettati_secondo_char(C) :-
+    C = 35.
+
 path([47, C | Codes], Path, After) :-  % /
-    identificatore(C),
+    path_accettati_secondo_char(C),
     path_aux([C | Codes], Path, After).
 
 path_aux([], [], []).
@@ -606,17 +618,25 @@ fragment([C | Codes], Fragment, After) :-
     parse_fragment(Codes, Fragment, After).
 
 caratteri(C) :-
-    is_alnum(C);
-    C = 45;  % -
-    C = 95;  % _
-    C = 43;  % +
+    is_alnum(C).
+caratteri(C) :-
+    C = 45.  % -
+caratteri(C) :-
+    C = 95.  % _
+caratteri(C) :-
+    C = 43.  % +
+caratteri(C) :-
     C = 61.  % =
 
 identificatore(C) :-
-    is_alnum(C);
-    C = 45;  % -
-    C = 95;  % _
-    C = 43;  % +
+    is_alnum(C).
+identificatore(C) :-
+    C = 45.  % -
+identificatore(C) :-
+    C = 95.  % _
+identificatore(C) :-
+    C = 43.  % +
+identificatore(C) :-
     C = 61.  % =
 
 generic_scheme(Schema) :-

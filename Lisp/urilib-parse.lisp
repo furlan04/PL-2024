@@ -77,7 +77,6 @@
           ((check-slashes after) (extract-authority (rest (rest after))))
           ((check-path-slashes after) NIL)
           (T (error "invalid URI"))))
-        
         )
      ( 
       ;; Construct the URI struct with parsed components and 
@@ -110,13 +109,26 @@
     )
   )
 
-;;; Validate and extract the host component
-(defun check-host (chars)
-  (if (equal (extract-host chars) nil)
-      (error "no host specified")    
-    (if (digit-char-p (first chars))
-        (check-ip (extract-host chars)) 
-      (coerce (extract-host chars) 'string)))                                    
+;;; Extract the scheme component from the URI
+(defun extract-scheme (chars)
+  (cond ((null chars) (error "Schema is not valid"))
+	(
+         (string= (first chars) ":")
+	 (defparameter after (rest chars))
+         NIL
+         )
+	(T (if (identificatorep (first chars))
+	       (append
+		(list (first chars))
+		(extract-scheme (rest chars)))
+             (error "invalid schema character")))))
+
+;;; Determine if a scheme is considered special 
+(defun isSpecial (scheme)
+  (or (string= scheme "mailto")
+      (string= scheme "news")
+      (string= scheme "tel")
+      (string= scheme "fax"))
   )
 
 ;;; Extract the authority component from the URI
@@ -153,43 +165,6 @@
    (string= (first chars) "/")
    (not( string= (second chars) "/")))
   )
-
-;;; Determine if a scheme is considered special 
-(defun isSpecial (scheme)
-  (or (string= scheme "mailto")
-      (string= scheme "news")
-      (string= scheme "tel")
-      (string= scheme "fax"))
-  )
-
-;;; Get the port number for a given scheme or use a provided port
-(defun get-port (scheme given-port)
-  (if given-port
-      given-port
-    (cond
-     ((string-equal scheme "http") 80)
-     ((string-equal scheme "https") 443)
-     ((string-equal scheme "ftp") 21)
-     ((string-equal scheme "mailto") 25)
-     ((string-equal scheme "news") 119)
-     ((string-equal scheme "tel") nil)
-     ((string-equal scheme "fax") nil)
-     ((string-equal scheme "zos") 23)
-     (t 80))))
-
-;;; Extract the scheme component from the URI
-(defun extract-scheme (chars)
-  (cond ((null chars) (error "Schema is not valid"))
-	(
-         (string= (first chars) ":")
-	 (defparameter after (rest chars))
-         NIL
-         )
-	(T (if (identificatorep (first chars))
-	       (append
-		(list (first chars))
-		(extract-scheme (rest chars)))
-             (error "invalid schema character")))))
 
 ;;; Extract the user info component from the URI
 (defun extract-userinfo (chars)
@@ -232,6 +207,72 @@
     )
   )
 
+;;; Validate and extract the host component
+(defun check-host (chars)
+  (if (equal (extract-host chars) nil)
+      (error "no host specified")    
+    (if (digit-char-p (first chars))
+        (check-ip (extract-host chars)) 
+      (coerce (extract-host chars) 'string)))                                    
+  )
+
+;;returns the IP address coerced to a string if it is valid, throws an error instead
+(defun check-ip (chars)
+  (let ((ip (extract-ip chars)))
+    (if 
+        (and
+         (equal (length ip) 4)
+         (every #'valid-ip-segment ip)
+         )
+        (coerce chars 'string)
+      (error "ip entered not valid")
+        )
+    )
+  )
+
+;;returns T if a segment is valid NIL if it is not
+(defun valid-ip-segment (segment)
+  (let ((num (parse-integer segment)))
+    (
+     and
+     (>= num 0)
+     (<= num 255)
+     (or (equal (length segment) 0) (not (string= (char segment 0) "0")))
+     )
+   )
+  )
+
+;;returns a list with all IP segments
+(defun extract-ip (chars) 
+  (let ((segment (extract-ip-segment chars)))
+    (if (equal NIL segment)
+        NIL
+      (append (list (coerce segment 'string)) (extract-ip ip-after))
+      )
+    )
+  )
+
+;;returns the next segment of the ip address (all unntil the ".")
+(defun extract-ip-segment (chars) 
+  (
+   cond 
+    ((null chars) 
+     (defparameter ip-after NIL)
+     NIL)
+    ((string= (first chars) ".") 
+     (defparameter ip-after (rest chars))
+     NIL
+     )
+    (T 
+     (if (digit-char-p (first chars))
+         (append (list (first chars)) (extract-ip-segment (rest chars)))
+       (error "Ip address contains a not numeric value" (first chars))
+       )
+     )
+    )
+  )
+
+
 ;;; Extract the port component from the URI
 (defun extract-port (chars)
   (
@@ -246,6 +287,44 @@
       )
     )
    )
+  )
+
+;;; Get the port number for a given scheme or use a provided port
+(defun get-port (scheme given-port)
+  (if given-port
+      given-port
+    (cond
+     ((string-equal scheme "http") 80)
+     ((string-equal scheme "https") 443)
+     ((string-equal scheme "ftp") 21)
+     ((string-equal scheme "mailto") 25)
+     ((string-equal scheme "news") 119)
+     ((string-equal scheme "tel") nil)
+     ((string-equal scheme "fax") nil)
+     ((string-equal scheme "zos") 23)
+     (t 80))))
+
+;;; Extract the path component from the URI
+(defun extract-path (chars) 
+  (
+   cond 
+   ;; If no characters remain, return NIL
+    ((null chars) NIL)
+    ;; Stop at '?' or '#' characters
+    ((or (string= (first chars) "?") (string= (first chars) "#")) 
+     (defparameter after chars)
+     (if (and (not (contains-at-most-one chars "?")) (not (contains-at-most-one chars "#"))) 
+         (error "uri cannot contain more than 1 query or fragment") 
+       NIL
+       ))
+    ;; Validate the character and continue extraction
+    (T 
+     (if (identificatorep (first chars))
+         (append (list (first chars)) (extract-path (rest chars)))
+       (error "invalid path character ~c" (first chars))
+       )
+     )
+    )
   )
 
 ;;; Validate and extract the zos-specific path
@@ -295,39 +374,22 @@
        (or (null id8-part)  
            (parse-id8 id8-part))))))
 
-;;; Extract the path component from the URI
-(defun extract-path (chars) 
-  (
-   cond 
-    ((null chars) NIL)
-    ((or (string= (first chars) "?") (string= (first chars) "#")) 
-     (defparameter after chars)
-     (if (and (not (contains-at-most-one chars "?")) (not (contains-at-most-one chars "#"))) 
-         (error "uri cannot contain more than 1 query or fragment") 
-       NIL
-       ))
-    
-    (T 
-     (if (identificatorep (first chars))
-         (append (list (first chars)) (extract-path (rest chars)))
-       (error "invalid path character ~c" (first chars))
-       )
-     )
-    )
-  )
+
 
 ;;; Extract the query component from the URI
 (defun extract-query (chars)
   (
    cond 
+   ;; If no characters remain, return NIL
    ((null chars) NIL)
+   ;; Stop at the '#' character
    ((string= (first chars) "#") 
     (defparameter after chars)
     (if (not (contains-at-most-one chars "#")) 
         (error "uri cannot contain more than 1 fragment") 
       NIL
       ))
-   
+   ;; Validate the character and continue extraction
    (T 
     (if (identificatorep (first chars))
         (append (list (first chars)) (extract-path (rest chars)))
@@ -340,8 +402,10 @@
 ;;; Extract the fragment component from the URI
 (defun extract-fragment (chars)
   (
-   cond 
+   cond
+   ;; If no characters remain, return NIL
    ((null chars) NIL)
+   ;; Validate the character and continue extraction
    (T 
     (if (identificatorep (first chars))
         (append (list (first chars)) (extract-path (rest chars)))
@@ -350,6 +414,65 @@
     )
    )
   )
+
+;;; Handle special schemes 
+(defun special-scheme (scheme after) 
+  (cond ((string= scheme "mailto")
+          ;; Handle the "mailto" scheme
+         (let ((schema scheme)
+               (userinfo (coerce (extract-userinfo after) 'string))
+               (host  (if (contains-char after "@")
+                          (coerce (extract-host (rest after)) 'string)))
+               (port (get-port scheme NIL)))
+           ;; Raise an error if invalid characters are present
+           (if (or (contains-char after "/")
+                   (contains-char after "#")
+                   (contains-char after "?"))
+               (error "Non corretto")
+             (make-uri-struct
+              :scheme schema
+              :userinfo userinfo
+              :host host
+              :port port))))
+        ;; Handle the "news" scheme
+        ((string= scheme "news")
+         (let ((schema scheme)
+               (userinfo (coerce (extract-userinfo after) 'string))
+               (host   (if (or (contains-char after "@")
+                               (contains-char after ":"))
+                           (error "Host non valido")
+                         (coerce (extract-host after) 'string)))        
+               (port (get-port scheme NIL)))
+           ;; Raise an error if invalid characters are present
+           (if (or (contains-char after "/")
+                   (contains-char after "#")
+                   (contains-char after "?"))
+               (error "Non corretto")
+             (make-uri-struct
+              :scheme schema
+              :userinfo userinfo
+              :host host
+              :port port))))
+        ;; Handle the "tel" and "fax" schemes
+        ((or (string= scheme "tel") (string= scheme "fax"))
+         (let ((schema scheme)
+               (userinfo (coerce (extract-userinfo after) 'string))
+               (host (if (or (contains-char after "@"))
+                         (error "Host non valido")
+                       (coerce (extract-host after) 'string)))        
+               (port (get-port scheme NIL)))
+           ;; Raise an error if invalid characters are present
+           (if (or (contains-char after "/")
+                   (contains-char after "#")
+                   (contains-char after "?"))
+               (error "Schema tel/fax non corretto")
+             (make-uri-struct
+              :scheme schema
+              :userinfo userinfo
+              :host host
+              :port port))))
+        ))
+      
 
 ;;; Check if a character is a valid identifier character
 (defun identificatorep (char)
@@ -381,115 +504,3 @@
     )
    (T  (contains-at-most-one (rest chars) char2Check alreadyFound))
    ))
-
-;;; Handle special schemes 
-(defun special-scheme (scheme after) 
-  (cond ((string= scheme "mailto")
-         (let ((schema scheme)
-               (userinfo (coerce (extract-userinfo after) 'string))
-               (host  (if (contains-char after "@")
-                          (coerce (extract-host (rest after)) 'string)))
-               (port (get-port scheme NIL)))
-           (if (or (contains-char after "/")
-                   (contains-char after "#")
-                   (contains-char after "?"))
-               (error "Non corretto")
-             (make-uri-struct
-              :scheme schema
-              :userinfo userinfo
-              :host host
-              :port port))))
-        
-        ((string= scheme "news")
-         (let ((schema scheme)
-               (userinfo (coerce (extract-userinfo after) 'string))
-               (host   (if (or (contains-char after "@")
-                               (contains-char after ":"))
-                           (error "Host non valido")
-                         (coerce (extract-host after) 'string)))        
-               (port (get-port scheme NIL)))
-           (if (or (contains-char after "/")
-                   (contains-char after "#")
-                   (contains-char after "?"))
-               (error "Non corretto")
-             (make-uri-struct
-              :scheme schema
-              :userinfo userinfo
-              :host host
-              :port port))))
-        
-        ((or (string= scheme "tel") (string= scheme "fax"))
-         (let ((schema scheme)
-               (userinfo (coerce (extract-userinfo after) 'string))
-               (host (if (or (contains-char after "@"))
-                         (error "Host non valido")
-                       (coerce (extract-host after) 'string)))        
-               (port (get-port scheme NIL)))
-           (if (or (contains-char after "/")
-                   (contains-char after "#")
-                   (contains-char after "?"))
-               (error "Non corretto")
-             (make-uri-struct
-              :scheme schema
-              :userinfo userinfo
-              :host host
-              :port port))))
-        ))
-       
-;;returns the next segment of the ip address (all unntil the ".")
-(defun extract-ip-segment (chars) 
-  (
-   cond 
-    ((null chars) 
-     (defparameter ip-after NIL)
-     NIL)
-    ((string= (first chars) ".") 
-     (defparameter ip-after (rest chars))
-     NIL
-     )
-    (T 
-     (if (digit-char-p (first chars))
-         (append (list (first chars)) (extract-ip-segment (rest chars)))
-       (error "Ip address contains a not numeric value" (first chars))
-       )
-     )
-    )
-  )
-
-
-;;returns a list with all IP segments
-(defun extract-ip (chars) 
-  (let ((segment (extract-ip-segment chars)))
-    (if (equal NIL segment)
-        NIL
-      (append (list (coerce segment 'string)) (extract-ip ip-after))
-      )
-    )
-  )
-
-
-;;returns T if a segment is valid NIL if it is not
-(defun valid-ip-segment (segment)
-  (let ((num (parse-integer segment)))
-    (
-     and
-     (>= num 0)
-     (<= num 255)
-     (or (equal (length segment) 0) (not (string= (char segment 0) "0")))
-     )
-   )
-  )
-
-;;returns the IP address coerced to a string if it is valid, throws an error instead
-(defun check-ip (chars)
-  (let ((ip (extract-ip chars)))
-    (if 
-        (and
-         (equal (length ip) 4)
-         (every #'valid-ip-segment ip)
-         )
-        (coerce chars 'string)
-      (error "ip entered not valid")
-        )
-    )
-  )

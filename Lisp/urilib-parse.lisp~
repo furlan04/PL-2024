@@ -51,7 +51,7 @@
   (if (not (typep urilib-struct 'URI-STRUCT))
       (error "incompatible type")
     (progn 
-       ;; Format and print each component of the URI
+      ;; Format and print each component of the URI
       (format stream "Scheme: ~13T ~S ~%" (urilib-scheme urilib-struct) )
       (format stream "UserInfo: ~13T ~S ~%" (urilib-userInfo urilib-struct) )
       (format stream "Host: ~13T ~S ~%" (urilib-host urilib-struct) )
@@ -73,7 +73,8 @@
         (scheme  (coerce (extract-scheme (coerce uri 'list)) 'string))
         (authority
          (cond
-          ((isSpecial (coerce (extract-scheme (coerce uri 'list)) 'string)) NIL)
+          ((isSpecial (coerce (extract-scheme (coerce uri 'list)) 'string)) 
+NIL)
           ((check-slashes after) (extract-authority (rest (rest after))))
           ((check-path-slashes after) NIL)
           (T (error "invalid URI"))))
@@ -83,30 +84,37 @@
       ;; checks if the "schema" part is special 
       if (isSpecial scheme)
       (special-scheme scheme after)
-       (
-        make-uri-struct
-        :scheme scheme
-        :path (if (string= scheme "zos")
-                  (if (string= (first after) "/") (coerce (zos-extract-path (rest after)) 'string)
-                    (coerce (zos-extract-path after) ))
-                (if (string= (first after) "/") 
-                    (coerce (extract-path (rest after)) 'string)
-                  (coerce (extract-path after) 'string)))
-        :query (if (string= (first after) "?") (coerce (extract-query (rest after)) 'string) NIL)
-        :fragment (if (string= (first after) "#") (coerce (extract-query (rest after)) 'string) NIL)
-        :userInfo (cond
-                   ((contains-char authority "@")
-                    (let ((auth authority))                        
-                    (coerce (extract-userInfo auth) 'string)))
-                   (T (defparameter after authority)  NIL))
-        :host (if (not (equal authority nil))
-                  (if (string= (first after) "@")
-                  (check-host (rest after))
-                    (check-host after))              
-                nil)
-        :port (if (string= (first after) ":") (coerce (extract-port (rest after)) 'string) (get-port scheme NIL))
-        )
+      (
+       make-uri-struct
+       :scheme scheme
+       :path (if (null after) NIL
+               (if (string= (first after) "/")
+                   (if (string= scheme "zos")
+                       (if (string= (first after) "/") 
+(coerce (zos-extract-path (rest after)) 'string)
+                         (coerce (zos-extract-path after) ))
+                     (if (string= (first after) "/") 
+                         (coerce (extract-path (rest after)) 'string)
+                       (coerce (extract-path after) 'string)))
+                 (error "Missing '/'")))
+       :query (if (string= (first after) "?") 
+(coerce (extract-query (rest after)) 'string) NIL)
+       :fragment (if (string= (first after) "#") 
+(coerce (extract-query (rest after)) 'string) NIL)
+       :userInfo (cond
+                  ((contains-char authority "@")
+                   (let ((auth authority))                        
+                     (coerce (extract-userInfo auth) 'string)))
+                  (T (defparameter after authority)  NIL))
+       :host (if (not (equal authority nil))
+                 (if (string= (first after) "@")
+                     (check-host (rest after))
+                   (check-host after))              
+               nil)
+       :port (if (string= (first after) ":") 
+(coerce (extract-port (rest after)) 'string) (get-port scheme NIL))
        )
+      )
      )
     (error "uri passed is not a string!")
     )
@@ -118,7 +126,7 @@
 	(
          (string= (first chars) ":")
 	 (defparameter after (rest chars))
-         (cond NIL (rest chars))
+         NIL
          )
 	(T (if (identificatorep (first chars))
 	       (append
@@ -228,7 +236,8 @@
       (coerce (extract-host chars) 'string)))                                    
   )
 
-;;returns the IP address coerced to a string if it is valid, throws an error instead
+;;returns the IP address coerced to a string if it is valid, 
+;;throws an error instead
 (defun check-ip (chars)
   (let ((ip (extract-ip chars)))
     (if 
@@ -325,7 +334,8 @@
     ;; Stop at '?' or '#' characters
     ((or (string= (first chars) "?") (string= (first chars) "#")) 
      (defparameter after chars)
-     (if (and (not (contains-at-most-one chars "?")) (not (contains-at-most-one chars "#"))) 
+     (if (and (not (contains-at-most-one chars "?")) 
+(not (contains-at-most-one chars "#"))) 
          (error "uri cannot contain more than 1 query or fragment") 
        NIL
        ))
@@ -490,7 +500,8 @@
         ((string= (first after) char) T)
         (T (contains-char (rest after) char))))
 
-;;; Ensure that the character list contains at most one occurrence of a character
+;;; Ensure that the character list contains 
+;;; at most one occurrence of a character
 (defun contains-at-most-one (chars char2Check &optional (alreadyFound nil)) 
   (
    cond 

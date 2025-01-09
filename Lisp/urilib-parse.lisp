@@ -207,12 +207,13 @@
          (error "uri cannot contain more than 1 port") 
        NIL))
     ((string= (first chars) ".")
-     (if isIP  ; se è un IP, accetta il punto senza controlli
+     (if isIP  ; se   un IP, accetta il punto senza controlli
          (append (list (first chars)) (extract-host (rest chars) isIP))
-         ; se non è un IP, controlla che il carattere dopo sia alfabetico
+         ; se non   un IP, controlla che il carattere dopo sia alfabetico
          (if (alpha-char-p (first (rest chars)))
              (append (list (first chars)) (extract-host (rest chars) isIP))
-             (error "extract host ip: invalid host character ~c" (first (rest chars))))))
+             (error "extract host ip: invalid host character ~c" 
+                    (first (rest chars))))))
     (T 
      (if (alphanumericp (first chars))  ; rimosso l'OR con il punto
          (append (list (first chars)) (extract-host (rest chars) isIP))
@@ -438,7 +439,7 @@
          (let ((schema scheme)
                (userinfo (coerce (extract-userinfo after) 'string))
                (host  (if (contains-char after "@")
-                          (coerce (extract-host (rest after)) 'string)))
+                          (coerce (check-host (rest after)) 'string)))
                (port (get-port scheme NIL)))
            ;; Raise an error if invalid characters are present
            (if (or (contains-char after "/")
@@ -456,7 +457,7 @@
                (host   (if (or (contains-char after "@")
                                (contains-char after ":"))
                            (error "Host non valido")
-                         (coerce (extract-host after) 'string)))        
+                         (coerce (check-host after) 'string)))        
                (port (get-port scheme NIL)))
            ;; Raise an error if invalid characters are present
            (if (or (contains-char after "/")

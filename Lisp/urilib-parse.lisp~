@@ -198,43 +198,38 @@
  )
 
 ;;; Extract the host component from the URI
-(defun extract-host (chars) 
-  (
-   cond 
-   ;; If no characters remain, return NIL
+(defun extract-host (chars &optional (isIP NIL)) 
+  (cond 
     ((null chars) NIL)
-    ;; Stop at the ':' character (indicating a port)
     ((string= (first chars) ":") 
      (defparameter after chars)
      (if (not (contains-at-most-one chars ":")) 
          (error "uri cannot contain more than 1 port") 
-       NIL
-       ))
-    ;; Valide the character after the "."
+       NIL))
     ((string= (first chars) ".")
-     (if (alpha-char-p (first (rest chars)))
-         (append (list (first chars)) (extract-host (rest chars)))
-       (error "extract host: invalid host character ~c" (first (rest chars)))
-       )
-     )
-    ;; Validate the character and continue extraction
+     (if isIP  ; se   un IP, accetta il punto senza controlli
+         (append (list (first chars)) (extract-host (rest chars) isIP))
+         ; se non   un IP, controlla che il carattere dopo sia alfabetico
+         (if (alpha-char-p (first (rest chars)))
+             (append (list (first chars)) (extract-host (rest chars) isIP))
+             (error "extract host ip: invalid host character ~c" 
+(first (rest chars))))))
     (T 
-     (if (alphanumericp (first chars))
-         (append (list (first chars)) (extract-host (rest chars)))
-       (error "extract host: invalid host character ~c" (first chars))
-       )
-     )
-    )
-  )
+     (if (alphanumericp (first chars))  ; rimosso l'OR con il punto
+         (append (list (first chars)) (extract-host (rest chars) isIP))
+       (error "extract host: invalid host character ~c" (first chars))))))
 
 ;;; Validate and extract the host component
 (defun check-host (chars)
-  (if (equal (extract-host chars) nil)
-      (error "no host specified")    
-    (if (digit-char-p (first chars))
-        (check-ip (extract-host chars)) 
-      (coerce (extract-host chars) 'string)))                                    
-  )
+  (if (digit-char-p (first chars))
+      ;If chars begins with a number
+      (if (equal (extract-host chars T) nil)
+          (error "no host specified")
+          (check-ip (extract-host chars T)))
+      ;Else it's considered a normal host
+      (if (equal (extract-host chars) nil)
+          (error "no host specified")
+          (coerce (extract-host chars) 'string))))
 
 ;;returns the IP address coerced to a string if it is valid, 
 ;;throws an error instead
@@ -444,7 +439,7 @@
          (let ((schema scheme)
                (userinfo (coerce (extract-userinfo after) 'string))
                (host  (if (contains-char after "@")
-                          (coerce (extract-host (rest after)) 'string)))
+                          (coerce (check-host (rest after)) 'string)))
                (port (get-port scheme NIL)))
            ;; Raise an error if invalid characters are present
            (if (or (contains-char after "/")
@@ -462,7 +457,7 @@
                (host   (if (or (contains-char after "@")
                                (contains-char after ":"))
                            (error "Host non valido")
-                         (coerce (extract-host after) 'string)))        
+                         (coerce (check-host after) 'string)))        
                (port (get-port scheme NIL)))
            ;; Raise an error if invalid characters are present
            (if (or (contains-char after "/")

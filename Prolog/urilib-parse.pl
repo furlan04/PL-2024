@@ -19,22 +19,32 @@ urilib_display(URI, Stream) :-
     format(Stream, 'Fragment = ~w\n', [Fragment]),
     close(Stream).
 
-%!  parse_uri_with_schema(+Schema, +AfterSchema, -URI)
-%
+    %!  parse_uri_with_schema(+Schema, +AfterSchema, -URI)
+    %
 
-% Schema seguito dal nulla
+    % Schema seguito dal nulla
 parse_uri_with_schema(Schema, [], URI) :-
+    Schema \= '',
+    default_port(Schema, Port),
     !,
-    URI = uri(Schema, [], [], 80, [], [], []).
+    URI = uri(Schema, [], [], Port, [], [], []).
 
 % -- FORMATO ZOS --
 
 % ZOS: Path completo con Query e Fragment
-parse_uri_with_schema(Schema, [], URI) :-
-    !,
-    URI = uri(Schema, [], [], 80, [], [], []).
 
 %   Parse di un URI senza Fragment secondo il formato dello Schema zos.
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    Schema = 'zos',
+    authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    isolate_path(AfterAuthority, PathCodes, AfterPath),
+    zos_path(PathCodes),
+    query(AfterPath, QueryCodes, []),
+    !,
+    atom_codes(Path, PathCodes),
+    atom_codes(Query, QueryCodes),
+    URI = uri(Schema, Userinfo, Host, Port, Path, Query, []).
+
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     Schema = 'zos',
     authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
@@ -82,6 +92,50 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     atom_codes(Fragment, FragmentCodes),
     URI = uri(Schema, Userinfo, Host, Port, Path, Query, Fragment).
 
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    Schema = 'zos',
+    isolate_path_aux(AfterSchema, PathCodes, []),
+    zos_path(PathCodes),
+    default_port(Schema, Port),
+    !,
+    atom_codes(Path, PathCodes),
+    URI = uri(Schema, [], [], Port, Path, [], []).
+
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    Schema = 'zos',
+    isolate_path_aux(AfterSchema, PathCodes, AfterPath),
+    zos_path(PathCodes),
+    default_port(Schema, Port),
+    query(AfterPath, QueryCodes, AfterQuery),
+    fragment(AfterQuery, FragmentCodes, []),
+    !,
+    atom_codes(Path, PathCodes),
+    atom_codes(Query, QueryCodes),
+    atom_codes(Fragment, FragmentCodes),
+    URI = uri(Schema, [], [], Port, Path, Query, Fragment).
+
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    Schema = 'zos',
+    isolate_path_aux(AfterSchema, PathCodes, AfterPath),
+    zos_path(PathCodes),
+    default_port(Schema, Port),
+    query(AfterPath, QueryCodes, []),
+    !,
+    atom_codes(Path, PathCodes),
+    atom_codes(Query, QueryCodes),
+    URI = uri(Schema, [], [], Port, Path, Query, []).
+
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    Schema = 'zos',
+    isolate_path_aux(AfterSchema, PathCodes, AfterPath),
+    zos_path(PathCodes),
+    default_port(Schema, Port),
+    fragment(AfterPath, FragmentCodes, []),
+    !,
+    atom_codes(Path, PathCodes),
+    atom_codes(Fragment, FragmentCodes),
+    URI = uri(Schema, [], [], Port, Path, [], Fragment).
+
 %   Parse di un URI senza Path secondo il formato generico.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     generic_scheme(Schema),
@@ -101,8 +155,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     path(AfterAuthority, PathCodes, AfterPath),
     query(AfterPath, QueryCodes, []),
     !,
-    (PathCodes = [],
-        Path = [] ; atom_codes(Path, PathCodes)),
+    path_codes_empty(PathCodes, Path),
     atom_codes(Query, QueryCodes),
     URI = uri(Schema, Userinfo, Host, Port, Path, Query, []).
 
@@ -113,8 +166,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     path(AfterAuthority, PathCodes, AfterPath),
     fragment(AfterPath, FragmentCodes, []),
     !,
-    (PathCodes = [],
-        Path = [] ; atom_codes(Path, PathCodes)),
+    path_codes_empty(PathCodes, Path),
     atom_codes(Fragment, FragmentCodes),
     URI = uri(Schema, Userinfo, Host, Port, Path, [], Fragment).
 
@@ -124,8 +176,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
     path(AfterAuthority, PathCodes, []),
     !,
-    (PathCodes = [],
-        Path = [] ; atom_codes(Path, PathCodes)),
+    path_codes_empty(PathCodes, Path),
     URI = uri(Schema, Userinfo, Host, Port, Path, [], []).
 
 %   Parse di un URI senza Path e Fragment secondo il formato generico.
@@ -160,8 +211,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
 %   Parse di un URI senza Path, Query e Fragment secondo il formato generico.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
-    (AfterAuthority = [];
-     AfterAuthority = [47]),
+    check_last(AfterAuthority),
     !,
     URI = uri(Schema, Userinfo, Host, Port, [], [], []).
 
@@ -177,6 +227,46 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     atom_codes(Query, QueryCodes),
     atom_codes(Fragment, FragmentCodes),
     URI = uri(Schema, Userinfo, Host, Port, Path, Query, Fragment).
+
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    generic_scheme(Schema),
+    path(AfterSchema, PathCodes, []),
+    default_port(Schema, Port),
+    !,
+    atom_codes(Path, PathCodes),
+    URI = uri(Schema, [], [], Port, Path, [], []).
+
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    generic_scheme(Schema),
+    path_aux(AfterSchema, PathCodes, AfterPath),
+    default_port(Schema, Port),
+    query(AfterPath, QueryCodes, AfterQuery),
+    fragment(AfterQuery, FragmentCodes, []),
+    !,
+    atom_codes(Path, PathCodes),
+    atom_codes(Query, QueryCodes),
+    atom_codes(Fragment, FragmentCodes),
+    URI = uri(Schema, [], [], Port, Path, Query, Fragment).
+
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    generic_scheme(Schema),
+    path_aux(AfterSchema, PathCodes, AfterPath),
+    default_port(Schema, Port),
+    query(AfterPath, QueryCodes, []),
+    !,
+    atom_codes(Path, PathCodes),
+    atom_codes(Query, QueryCodes),
+    URI = uri(Schema, [], [], Port, Path, Query, []).
+
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    generic_scheme(Schema),
+    path_aux(AfterSchema, PathCodes, AfterPath),
+    default_port(Schema, Port),
+    fragment(AfterPath, FragmentCodes, []),
+    !,
+    atom_codes(Path, PathCodes),
+    atom_codes(Fragment, FragmentCodes),
+    URI = uri(Schema, [], [], Port, Path, [], Fragment).
 
 %   Parse di un URI contenente solo Userinfo secondo il formato dello Schema
 %   mailto.
@@ -211,12 +301,17 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
 %   Parse di un URI contenente solo Userinfo secondo il formato degli Schema
 %   tel e fax.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
-    (Schema = 'tel';
-     Schema = 'fax'),
+    tel_or_fax(Schema),
     plain_userinfo(AfterSchema, U, []),
     !,
     atom_codes(Userinfo, U),
     URI = uri(Schema, Userinfo, [], [], [], [], []).
+
+tel_or_fax('tel').
+tel_or_fax('fax').
+
+check_last([]).
+check_last([47]).
 
 %!  schema(+Codes, -Schema, -After)
 %
@@ -307,8 +402,8 @@ authority(Schema, [C1, C2 | Chars], Userinfo, Host, Port, After) :-
 
 %   Parse di Authority non presente, quindi si passa direttamente al Path.
 authority(Schema, [C1, C2 | Chars], Userinfo, Host, Port, After) :-
-    C1 = 47,  
-    C2 \= 47, 
+    C1 = 47,
+    C2 \= 47,
     !,
     Userinfo = [],
     Host = [],
@@ -316,8 +411,8 @@ authority(Schema, [C1, C2 | Chars], Userinfo, Host, Port, After) :-
     After = [C1, C2 | Chars].
 
 authority(Schema, [C1, C2 | Chars], Userinfo, Host, Port, After) :-
-    C1 = 35, 
-    C2 \= 35, 
+    C1 = 35,
+    C2 \= 35,
     !,
     Userinfo = [],
     Host = [],
@@ -325,7 +420,7 @@ authority(Schema, [C1, C2 | Chars], Userinfo, Host, Port, After) :-
     After = [C1, C2 | Chars].
 
 authority(Schema, [C1, C2 | Chars], Userinfo, Host, Port, After) :-
-    C1 = 63, 
+    C1 = 63,
     C2 \= 63,
     !,
     Userinfo = [],
@@ -479,9 +574,9 @@ port([58 | Codes], Port, After) :-  % :
     number_codes(_, Port).
 
 port_aux([], [], []).
-port_aux([47 | Rest], [], [47 | Rest]) :- !.  
-port_aux([63 | Rest], [], [63 | Rest]) :- !.  
-port_aux([35 | Rest], [], [35 | Rest]) :- !.  
+port_aux([47 | Rest], [], [47 | Rest]) :- !.
+port_aux([63 | Rest], [], [63 | Rest]) :- !.
+port_aux([35 | Rest], [], [35 | Rest]) :- !.
 port_aux([C | Codes], [C | Port], After) :-
     is_digit(C),
     port_aux(Codes, Port, After).
@@ -501,11 +596,12 @@ path_aux([], [], []).
 path_aux([63 | Rest], [], [63 | Rest]) :- !.  % ?
 path_aux([35 | Rest], [], [35 | Rest]) :- !.  % #
 path_aux([47, C | Codes], [47, C | Path], After) :-
-    identificatore(C), 
-    path_aux(Codes, Path, After). 
+    identificatore(C),
+    path_aux(Codes, Path, After).
 path_aux([C | Codes], [C | Path], After) :-
     identificatore(C),  % This will fail if C is not a valid character
     path_aux(Codes, Path, After).
+
 %
 %   Viene estratto il Path dai codici passati in input secondo il formato
 %   dello Schema zos.
@@ -645,3 +741,10 @@ generic_scheme(Schema) :-
     Schema \= 'tel',
     Schema \= 'fax',
     Schema \= 'news'.
+
+
+path_codes_empty(PathCodes, Path) :-
+    PathCodes = [],        
+    Path = []. 
+path_codes_empty(PathCodes, Path) :-
+    atom_codes(Path, PathCodes).

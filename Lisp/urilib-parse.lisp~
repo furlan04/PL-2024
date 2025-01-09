@@ -197,9 +197,16 @@
          (error "uri cannot contain more than 1 port") 
        NIL
        ))
+    ;; Valide the character after the "."
+    ((string= (first chars) ".")
+     (if (alpha-char-p (first (rest chars)))
+         (append (list (first chars)) (extract-host (rest chars)))
+       (error "extract host: invalid host character ~c" (first (rest chars)))
+       )
+     )
     ;; Validate the character and continue extraction
     (T 
-     (if (identificatorep (first chars))
+     (if (alphanumericp (first chars))
          (append (list (first chars)) (extract-host (rest chars)))
        (error "extract host: invalid host character ~c" (first chars))
        )
@@ -319,7 +326,7 @@
        ))
     ;; Validate the character and continue extraction
     (T 
-     (if (identificatorep (first chars))
+     (if (or (identificatorep (first chars)) (string= (first chars) "/"))
          (append (list (first chars)) (extract-path (rest chars)))
        (error "invalid path character ~c" (first chars))
        )
@@ -469,12 +476,9 @@
       (string= char "=")
       (string= char "+")
       (string= char "-")
-      (string= char ".")
-      (string= char "/")
-      (string= char "(")
-      (string= char ")")
       ))
   
+
 ;;; Check if a character list contains the specified character
 (defun contains-char (after char)
   (cond ((null after) NIL)

@@ -83,30 +83,33 @@
       ;; checks if the "schema" part is special 
       if (isSpecial scheme)
       (special-scheme scheme after)
-       (
-        make-uri-struct
-        :scheme scheme
-        :path (if (string= scheme "zos")
-                  (if (string= (first after) "/") (coerce (zos-extract-path (rest after)) 'string)
-                    (coerce (zos-extract-path after) ))
-                (if (string= (first after) "/") 
-                    (coerce (extract-path (rest after)) 'string)
-                  (coerce (extract-path after) 'string)))
-        :query (if (string= (first after) "?") (coerce (extract-query (rest after)) 'string) NIL)
-        :fragment (if (string= (first after) "#") (coerce (extract-query (rest after)) 'string) NIL)
-        :userInfo (cond
-                   ((contains-char authority "@")
-                    (let ((auth authority))                        
-                    (coerce (extract-userInfo auth) 'string)))
-                   (T (defparameter after authority)  NIL))
-        :host (if (not (equal authority nil))
-                  (if (string= (first after) "@")
-                  (check-host (rest after))
-                    (check-host after))              
-                nil)
-        :port (if (string= (first after) ":") (coerce (extract-port (rest after)) 'string) (get-port scheme NIL))
-        )
+      (
+       make-uri-struct
+       :scheme scheme
+       :path (if (null after) NIL
+               (if (string= (first after) "/")
+                   (if (string= scheme "zos")
+                       (if (string= (first after) "/") (coerce (zos-extract-path (rest after)) 'string)
+                         (coerce (zos-extract-path after) ))
+                     (if (string= (first after) "/") 
+                         (coerce (extract-path (rest after)) 'string)
+                       (coerce (extract-path after) 'string)))
+                 (error "Missing '/'")))
+       :query (if (string= (first after) "?") (coerce (extract-query (rest after)) 'string) NIL)
+       :fragment (if (string= (first after) "#") (coerce (extract-query (rest after)) 'string) NIL)
+       :userInfo (cond
+                  ((contains-char authority "@")
+                   (let ((auth authority))                        
+                     (coerce (extract-userInfo auth) 'string)))
+                  (T (defparameter after authority)  NIL))
+       :host (if (not (equal authority nil))
+                 (if (string= (first after) "@")
+                     (check-host (rest after))
+                   (check-host after))              
+               nil)
+       :port (if (string= (first after) ":") (coerce (extract-port (rest after)) 'string) (get-port scheme NIL))
        )
+      )
      )
     (error "uri passed is not a string!")
     )
@@ -118,7 +121,7 @@
 	(
          (string= (first chars) ":")
 	 (defparameter after (rest chars))
-         (cond NIL (rest chars))
+         NIL
          )
 	(T (if (identificatorep (first chars))
 	       (append

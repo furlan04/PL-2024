@@ -87,8 +87,11 @@
         make-uri-struct
         :scheme scheme
         :path (if (string= scheme "zos")
-                  (if (string= (first after) "/") (coerce (zos-extract-path (rest after)) 'string) NIL)
-                (if (string= (first after) "/") (coerce (extract-path (rest after)) 'string) NIL))
+                  (if (string= (first after) "/") (coerce (zos-extract-path (rest after)) 'string)
+                    (coerce (zos-extract-path after) ))
+                (if (string= (first after) "/") 
+                    (coerce (extract-path (rest after)) 'string)
+                  (coerce (extract-path after) 'string)))
         :query (if (string= (first after) "?") (coerce (extract-query (rest after)) 'string) NIL)
         :fragment (if (string= (first after) "#") (coerce (extract-query (rest after)) 'string) NIL)
         :userInfo (cond
@@ -115,7 +118,7 @@
 	(
          (string= (first chars) ":")
 	 (defparameter after (rest chars))
-         NIL
+         (cond NIL (rest chars))
          )
 	(T (if (identificatorep (first chars))
 	       (append
@@ -161,9 +164,11 @@
 
 ;;; Check if the URI starts with a single slash
 (defun check-path-slashes (chars) 
-  (and 
-   (string= (first chars) "/")
-   (not( string= (second chars) "/")))
+  (or 
+   (not (string= (first chars) "/"))
+   (and 
+    (string= (first chars) "/")
+    (not( string= (second chars) "/"))))
   )
 
 ;;; Extract the user info component from the URI
@@ -290,7 +295,7 @@
    (T 
     (if (digit-char-p (first chars))
         (append (list (first chars)) (extract-port (rest chars)))
-      (error "invalid fragment character ~c" (first chars))
+      (error "invalid port character ~c" (first chars))
       )
     )
    )

@@ -197,6 +197,13 @@
          (error "uri cannot contain more than 1 port") 
        NIL
        ))
+    ;; Valide the character after the "."
+    ((string= (first chars) ".")
+     (if (alpha-char-p (first (rest chars)))
+         (append (list (first chars)) (extract-host (rest chars)))
+       (error "extract host: invalid host character ~c" (first (rest chars)))
+       )
+     )
     ;; Validate the character and continue extraction
     (T 
      (if (identificatorep (first chars))

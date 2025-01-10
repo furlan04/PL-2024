@@ -1,6 +1,3 @@
-<<<<<<< Updated upstream
-=======
-
 
 ;;; Define a structure for representing a URI
 (defstruct uri-struct
@@ -113,7 +110,7 @@
                   NIL
                 (if (string= (first (cdr port)) "/")
                     (if (string= scheme "zos")
-                        (coerce (zos-extract-path (rest (cdr port))) 'string)
+                        (zos-extract-path (rest (cdr port)))
                       (extract-path (rest (cdr port)))
                       )
                   (error "Missing '/'")
@@ -420,7 +417,7 @@
      (t 80))))
 
 ;;; Extract the path component from the URI
-(defun extract-path (chars) 
+(defun extract-path (chars &optional (zos NIL)) 
   (
    cond 
 
@@ -434,8 +431,12 @@
 
     ;; Validate the character and continue extraction
     (T 
-     (if (or (identificatorep (first chars)) (string= (first chars) "/"))
-         (let ((rest-path (extract-path (rest chars))))
+     (if (or 
+          (identificatorep (first chars)) 
+          (string= (first chars) "/") 
+          (and zos (or (string= (first chars) "(") (string= (first chars) ")") (string= (first chars) ".") ))
+          )
+         (let ((rest-path (extract-path (rest chars) zos)))
            (make-cons (first chars) rest-path)
            )
        (error "invalid path character ~c" (first chars))
@@ -446,65 +447,95 @@
 
 ;;; Validate and extract the zos-specific path
 (defun zos-extract-path (chars)
-  (let((zos-path (extract-path chars)))
-    (if (valid-zos-path-p zos-path)
-        zos-path
-      (error "path zos non corretta")))  
+  (let ((path (extract-path chars T)))
+    (if (valid-zos-path (car path))
+        path
+      (error "invalid zos path")
+     )
+   )
   )
 
-;;; Validate the ZOS path format
-(defun valid-zos-path-p (char-list)
-  (labels ((alphanumeric-char-p (char)
-             (or (alpha-char-p char)
-                 (digit-char-p char)))
-          
-          (valid-id44-char-p (char)
-             (or (alphanumeric-char-p char)
-                 (char= char #\.)))
-          
-          (parse-id8 (chars)
-             (and chars  
-                  (char= (first chars) #\()
-                  (let* ((closing-pos (position #\) chars))
-                         (id8-chars (when closing-pos 
-                                    (subseq chars 1 closing-pos))))
-                    (and closing-pos
-                         (= (1+ closing-pos) (length chars))  
-                         id8-chars
-                         (<= (length id8-chars) 8)
-                         (every #'alphanumeric-char-p id8-chars)))))
-          
-          (find-id8-start (chars)
-             (position #\( chars)))
-    
-    (let* ((id8-start (find-id8-start char-list))
-           (id44-part (if id8-start 
-                         (subseq char-list 0 id8-start)
-                         char-list))
-           (id8-part (when id8-start 
-                      (subseq char-list id8-start))))
-      
-      (and 
-       (<= (length id44-part) 44)
-       (not (null id44-part))  
-       (every #'valid-id44-char-p id44-part)
-       (or (null id8-part)  
-           (parse-id8 id8-part))))))
+(defun valid-zos-path (chars) 
+  (let* (
+         (id44 (extract-id44 chars))
+         (id8 (extract-id8 (rest (cdr id44))))
+         )
+    (and
+     ;; Id44 conditions
+     (and (alpha-char-p (first (car id44))) (every #'valid-id44-char-p (car id44)))
+
+     ;; Id8 conditions
+     (or (null id8)
+         (and 
+          (alpha-char-p (first (car id8))) 
+          (every #'alphanumericp (car id8)) 
+          (not (null (cdr id8)))
+          )
+         )
+     )
+    )
+  )
+
+(defun extract-id44 (chars) 
+  (cond 
+   ;; If no characters remain, return NIL
+   ((null chars)  NIL)
+   
+   ;; Stop at '(' character
+   ((string= (first chars) "(") 
+    (cons NIL chars)
+    )
+   
+   ;; Validate the character and continue extraction
+   (T
+    (let ((rest-id44 (extract-id44 (rest chars))))
+      (make-cons (first chars) rest-id44)
+      )
+    )
+   )
+  )
+
+
+(defun extract-id8 (chars) 
+ (cond 
+   ;; If no characters remain, return NIL
+   ((null chars)  NIL)
+   
+   ;; Stop at ')' character
+   ((string= (first chars) ")") 
+    (cons NIL chars)
+    )
+   
+   ;; Validate the character and continue extraction
+   (T
+    (let ((rest-id8 (extract-id8 (rest chars))))
+      (make-cons (first chars) rest-id8)
+      )
+    )
+   )
+  )
+
+
+
+(defun valid-id44-char-p (char)
+  (or (alphanumericp char)
+      (string= char ".")))
+
 
 
 
 ;;; Extract the query component from the URI
 (defun extract-query (chars)
    (cond 
-
-   ;; If no characters remain, return NIL
+    
+    ;; If no characters remain, return NIL
     ((null chars)  NIL)
-
+    
     ;; Stop at '#' character
     ((string= (first chars) "#") 
-       (cons NIL chars)
-       )
-
+     (cons NIL chars)
+     )
+    
     ;; Validate the character and continue extraction
     (T 
      (if (identificatorep (first chars))
@@ -515,7 +546,7 @@
        )
      )
     )
-  )
+   )
 
 ;;; Extract the fragment component from the URI
 (defun extract-fragment (chars)
@@ -611,4 +642,4 @@
     )
    (T  (contains-at-most-one (rest chars) char2Check alreadyFound))
    ))
->>>>>>> Stashed changes
+

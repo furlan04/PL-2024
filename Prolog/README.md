@@ -13,10 +13,12 @@ La libreria utilizza il predicato **urilib_parse/2**, il quale analizza una stri
 
 L'interprete restituisce altrimenti <span style="color: red;">False</span> se la stringa non è in un formato corretto.
 
-Un esempio di chiamata è:
+
+Un esempio di chiamata è:  
 **?- urilib_parse(”http://disco.unimib.it”, URI).**
 
-Il risultato della query sarà:
+
+Il risultato della query sarà:  
 *URI = uri(http, [], ’disco.unimib.it’, 80, [], [], [])*
 
 

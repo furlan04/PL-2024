@@ -66,7 +66,12 @@
 ;;; Parse a URI string and return a `uri-struct` instance
 (defun urilib-parse (uri)
   (
+   ;; checks if the "schema" part is special
    if (stringp uri) 
+   (if (isSpecial (coerce (car (extract-scheme (coerce uri 'list))) 'string))
+       (special-scheme (coerce (car (extract-scheme (coerce uri 'list))) 'string) 
+                       (cdr (extract-scheme (coerce uri 'list)))
+                       )
    (let*
        (
         (scheme  (coerce (car (extract-scheme (coerce uri 'list))) 'string))
@@ -92,7 +97,7 @@
                   )
 
 
-        (host (if (not (equal authority nil))
+        (host (if (not (null authority))
                   (check-host (cdr userInfo))
                 (cons NIL (cdr userInfo))
                 )
@@ -106,16 +111,22 @@
               )
 
 
-        (path (if (null (cdr port))
-                  NIL
-                (if (string= (first (cdr port)) "/")
-                    (if (string= scheme "zos")
-                        (zos-extract-path (rest (cdr port)))
-                      (extract-path (rest (cdr port)))
-                      )
-                  (error "Missing '/'")
-                  )
-                  
+        (path (let ((after (if (null authority) 
+                              rest-scheme
+                            (cdr port)
+                            )
+                          )
+                    )
+                (if (null after)
+                    NIL
+                  (if (string= (first after) "/")
+                      (if (string= scheme "zos")
+                          (zos-extract-path (rest after))
+                         (extract-path (rest after))
+                         )
+                    (error "Missing '/'")
+                    )
+                  )       
                 )
               )
         
@@ -136,10 +147,7 @@
 
      ( 
       ;; Construct the URI struct with parsed components and 
-      ;; checks if the "schema" part is special 
-      if (isSpecial scheme)
-      (special-scheme scheme rest-scheme)
-      (
+      
        make-uri-struct
        :scheme scheme
        
@@ -147,7 +155,10 @@
                      NIL
                    (coerce (car userInfo) 'string)
                    )
-       :host (coerce (car host) 'string)
+       :host (if (string= (coerce (car host) 'string)  "")
+                 NIL
+               (coerce (car host) 'string)
+               )
        
        :port (if (listp (car port))
               (coerce (car port) 'string)
@@ -165,8 +176,9 @@
                 )
        :fragment fragment
    
-       )
+       
       )
+     )
      )
     (error "uri passed is not a string!")
     )
@@ -462,13 +474,17 @@
          )
     (and
      ;; Id44 conditions
-     (and (alpha-char-p (first (car id44))) (every #'valid-id44-char-p (car id44)))
+     (and (alpha-char-p (first (car id44))) 
+          (every #'valid-id44-char-p (car id44))
+          (<= (length (car id44)) 44)
+          )
 
      ;; Id8 conditions
      (or (null id8)
          (and 
           (alpha-char-p (first (car id8))) 
-          (every #'alphanumericp (car id8)) 
+          (every #'alphanumericp (car id8))
+          (<= (length (car id8)) 8)
           (not (null (cdr id8)))
           )
          )
@@ -569,36 +585,35 @@
 (defun special-scheme (scheme after) 
   (cond ((string= scheme "mailto")
           ;; Handle the "mailto" scheme
-         (let ((schema scheme)
-               (userinfo (coerce (extract-userinfo after) 'string))
+         (let* ((userInfo (extract-userinfo after))
                (host  (if (contains-char after "@")
-                          (coerce (extract-host (rest after)) 'string)))
+                          (coerce (car (check-host  (cdr userInfo))) 'string)))
                (port (get-port scheme NIL)))
            ;; Raise an error if invalid characters are present
            (if (or (contains-char after "/")
                    (contains-char after "#")
                    (contains-char after "?"))
-               (error "Non corretto")
+               (error "Schema mailto non corretto")
              (make-uri-struct
-              :scheme schema
-              :userinfo userinfo
+              :scheme scheme
+              :userinfo (coerce (car userInfo) 'string)
               :host host
               :port port))))
         ;; Handle the "news" scheme
         ((string= scheme "news")
-         (let ((schema scheme)
+         (let (
                (host   (if (or (contains-char after "@")
                                (contains-char after ":"))
                            (error "Host non valido")
-                         (coerce (extract-host after) 'string)))        
+                         (coerce (car (check-host after)) 'string)))        
                (port (get-port scheme NIL)))
            ;; Raise an error if invalid characters are present
            (if (or (contains-char after "/")
                    (contains-char after "#")
                    (contains-char after "?"))
-               (error "Non corretto")
+               (error "Schema news non corretto")
              (make-uri-struct
-              :scheme schema
+              :scheme scheme
               :host host
               :port port))))
         ;; Handle the "tel" and "fax" schemes

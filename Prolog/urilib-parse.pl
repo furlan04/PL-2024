@@ -302,6 +302,14 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
 
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     generic_scheme(Schema),
+    path_aux(AfterSchema, PathCodes, []),
+    default_port(Schema, Port),
+    !,
+    atom_codes(Path, PathCodes),
+    URI = uri(Schema, [], [], Port, Path, [], []).
+
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    generic_scheme(Schema),
     path_aux(AfterSchema, PathCodes, AfterPath),
     default_port(Schema, Port),
     query(AfterPath, QueryCodes, AfterQuery),

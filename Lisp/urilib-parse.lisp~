@@ -1,5 +1,3 @@
-<<<<<<< Updated upstream
-=======
 
 
 ;;; Define a structure for representing a URI
@@ -73,24 +71,22 @@
    (let*
        (
         (scheme  (coerce (car (extract-scheme (coerce uri 'list))) 'string))
-        
-        (rest-scheme (cdr (extract-scheme (coerce uri 'list))))
+        (scheme-after (cdr (extract-scheme (coerce uri 'list))))
 
-        
+
+        ;;da verificare
         (authority
          (cond
-          ((isSpecial scheme) NIL)
-          (
-           (check-slashes rest-scheme) 
-           (extract-authority (rest (rest rest-scheme)))
-           )
-          ((check-path-slashes rest-scheme) NIL)
+          ((isSpecial (coerce (car (extract-scheme (coerce uri 'list))) 'string)) 
+           NIL)
+          ((check-slashes after) (extract-authority (rest (rest after))))
+          ((check-path-slashes after) NIL)
           (T (error "invalid URI"))))
 
 
-        (userInfo (if (contains-char rest-scheme  "@")                     
-                      (extract-userInfo (rest (rest rest-scheme)))
-                    (cons NIL (rest (rest rest-scheme)))
+        (userInfo (if (contains-char scheme-after "@")                     
+                      (extract-userInfo (rest (rest scheme-after)))
+                    (cons NIL (rest (rest scheme-after)))
                     )
                   )
 
@@ -128,20 +124,13 @@
                  (cons NIL (cdr path))
                  )
                )
-
-        (fragment (if (string= (first (cdr query)) "#") 
-                      (coerce (extract-fragment (rest (cdr query))) 'string) 
-                    NIL
-                    )
-                  )
-        
         )
 
      ( 
       ;; Construct the URI struct with parsed components and 
       ;; checks if the "schema" part is special 
       if (isSpecial scheme)
-      (special-scheme scheme rest-scheme)
+      (special-scheme scheme after)
       (
        make-uri-struct
        :scheme scheme
@@ -166,7 +155,6 @@
                   NIL
                 (coerce (car query) 'string)
                 )
-       :fragment fragment
    
        )
       )
@@ -181,6 +169,7 @@
   (cond ((null chars) (error "Schema is not valid"))
 	(
          (string= (first chars) ":")
+	 (defparameter after (rest chars))
          (cons NIL (rest chars))
          )
 	(T (if (identificatorep (first chars))
@@ -201,19 +190,19 @@
 (defun extract-authority (chars)
   (
    cond 
-   ((or 
-     (null chars)
-     (string= (first chars) "/")
-     (string= (first chars) "?")
-     (string= (first chars) "#")) 
-    (cons NIL chars)
-    )
-   
-   (T 
-    (let ((rest-authority (extract-authority (rest chars))))
-      (make-cons (first chars) rest-authority)
-        ) 
-    )
+   ( (or 
+      (string= (first chars) "/")
+      (string= (first chars) "?")
+      (string= (first chars) "#")) 
+     (defparameter after chars)
+     NIL)
+   ( (null chars)
+     (defparameter after NIL)
+     NIL)   
+   ( T 
+     (append (list (first chars))
+             (extract-authority (rest chars)))
+     )
    )
   )
 
@@ -244,6 +233,7 @@
     )
    (T 
     (if (identificatorep (first chars))
+      
         (let ((rest-userInfo (extract-userInfo (rest chars))))
         (make-cons (first chars) rest-userInfo)
         )       
@@ -523,11 +513,10 @@
    cond
    ;; If no characters remain, return NIL
    ((null chars) NIL)
-   
    ;; Validate the character and continue extraction
    (T 
     (if (identificatorep (first chars))
-        (append (list (first chars)) (extract-fragment (rest chars)))
+        (append (list (first chars)) (extract-path (rest chars)))
       (error "invalid fragment character ~c" (first chars))
       )
     )
@@ -611,4 +600,3 @@
     )
    (T  (contains-at-most-one (rest chars) char2Check alreadyFound))
    ))
->>>>>>> Stashed changes

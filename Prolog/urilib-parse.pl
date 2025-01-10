@@ -68,7 +68,8 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     atom_codes(Fragment, FragmentCodes),
     URI = uri(Schema, Userinfo, Host, Port, Path, [], Fragment).
 
-%   Parse di un URI senza Query e Fragment secondo il formato dello Schema zos.
+%   Parse di un URI senza Query e Fragment secondo il formato dello 
+% Schema zos.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     Schema = 'zos',
     authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
@@ -362,7 +363,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     atom_codes(Host, H),
     URI = uri('mailto', Userinfo, Host, [], [], [], []).
 
-%   Parse di un URI contenente solo l'Host secondo il formato dello Schema news.
+% Parse di un URI contenente solo l'Host secondo il formato dello Schema news
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     Schema = 'news',
     host(AfterSchema, H, []),

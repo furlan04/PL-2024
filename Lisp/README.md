@@ -1,6 +1,6 @@
 # Parsing di stringhe URI
 
-Questo progetto realizza una libreria implementata il **Prolog** contenente delle strutture che rappresentano internamente delle URI a partire dalla loro rappresentazione come stringhe.
+Questo progetto realizza una libreria implementata in **Common Lisp** (un dialetto di **Lisp**) contenente delle strutture che rappresentano internamente delle URI a partire dalla loro rappresentazione come stringhe.
 
 - [Utilizzo](#utilizzo)
 - [Funzionamento](#funzionamento)
@@ -9,17 +9,15 @@ Questo progetto realizza una libreria implementata il **Prolog** contenente dell
 
 ## Utilizzo
 
-La libreria utilizza il predicato **urilib_parse/2**, il quale analizza una stringa rappresentante un URI in formato testuale e ne restituisce una versione suddivisa nei suoi componenti.
+La libreria utilizza la funzione **urilib-parse**, che restituisce un **uri-struct** che contiene i componenti di un URI scomposto, a partire da una stringa contenente un URI in formato testuale;
 
-L'interprete restituisce altrimenti <span style="color: red;">False</span> se la stringa non è in un formato corretto.
+Per utilizzare il programma basterà quindi eseguire la funzione **urilib-parse**.
 
+Un esempio di chiamata è:
+**(urilib-parse ”http://disco.unimib.it”)**
 
-Un esempio di chiamata è:  
-**?- urilib_parse(”http://disco.unimib.it”, URI).**
-
-
-Il risultato della query sarà:  
-*URI = uri(http, [], ’disco.unimib.it’, 80, [], [], [])*
+L'output ricevuto sarà:
+*#S(URI-STRUCT :SCHEME "http" :USERINFO NIL :HOST "disco.unimib.it" :PORT 80 :PATH NIL :QUERY NIL :FRAGMENT NIL)*
 
 
 ## Funzionamento
@@ -32,6 +30,16 @@ La libreria suddivide la stringa dell'URI nei seguenti componenti:
 5. Path
 6. Query
 7. Fragment
+
+Questo è eseguito grazie all'esistenza di una funzione per ogni componente dell'URI presente in uri-struct, in grado di restituire il singolo componente dallo struct:
+
+- **urilib-scheme**
+- **urilib-userinfo**
+- **urilib-host**
+- **urilib-port**
+- **urilib-path**
+- **urilib-query**
+- **urilib-fragment**
 
 ---
 
@@ -50,7 +58,7 @@ Questo parser riconosce diversi schemi per gli URI:
 	- fax
 	- zos
 
-Per fare ciò, viene prima riconosciuto lo schema utilizzato tramite il predicato **parse_uri_with_schema/3**,poi vengono impiegati diversi predicati, ognuno in grado di eseguire il parse dei singoli componenti.
+Per fare ciò, viene prima riconosciuto lo schema utilizzato, poi vengono impiegate diverse funzioni, ognuna in grado di eseguire il parse dei singoli componenti.
 
 A seconda che si utilizzi uno schema speciale o generale, si applicano regole sintattiche differenti, che possono portare alla scomposizione della stringa e alla restituzione del risultato, questo perchè non per ogni schema l'URI conterrà tutti i componenti standard sopra indicati, e potrebbero essere contenuti in formati diversi;
 
@@ -65,11 +73,14 @@ Ecco una tabella che indica quali componenti troviamo in un URI di ogni schema:
 | Fax    | Schema, Userinfo |
 | Zos    | Schema, Userinfo, Host, Port, Path, Query, Fragment  |
 
+Nel caso in cui un componente non sia presente, nell' uri-struct di output sarà presente "NIL" nella voce di quel componente (vedi esempio sopra riportato, dove non sono presenti Userinfo, Path, Query e Fragment).
+
 ---
 
-Sono disponibili due predicati, **uri_display/1** e **uri_display/2**, per stampare su uno stream di destinazione.
+La funzione **urilib-display** consente di stampare dati su uno stream di destinazione specificato. 
 
-Nel caso di **uri_display/2**, lo schema deve essere fornito come argomento, mentre **uri_display/1** utilizza lo stream corrente per richiamare **uri_display/2**.
+Qualora venga passato uno stream come argomento, l'output sarà diretto a tale stream;
+In assenza di uno stream esplicitamente indicato, l'output verrà prodotto sullo stream corrente.
 
 ## Autori
 Progetto del corso di Linguaggi e Programmazione, realizzato da:

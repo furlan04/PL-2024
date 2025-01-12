@@ -19,6 +19,13 @@ Un esempio di chiamata è:
 L'output ricevuto sarà:  
 *#S(URI-STRUCT :SCHEME "http" :USERINFO NIL :HOST "disco.unimib.it" :PORT 80 :PATH NIL :QUERY NIL :FRAGMENT NIL)*
 
+---
+
+La funzione **urilib-display** consente di stampare dati su uno stream di destinazione specificato. 
+
+Qualora venga passato uno stream come argomento, l'output sarà diretto a tale stream;
+In assenza di uno stream esplicitamente indicato, l'output verrà prodotto sullo stream corrente.
+
 
 ## Funzionamento
 
@@ -75,12 +82,7 @@ Ecco una tabella che indica quali componenti troviamo in un URI di ogni schema:
 
 Nel caso in cui un componente non sia presente, nell' uri-struct di output sarà presente "NIL" nella voce di quel componente (vedi esempio sopra riportato, dove non sono presenti Userinfo, Path, Query e Fragment).
 
----
 
-La funzione **urilib-display** consente di stampare dati su uno stream di destinazione specificato. 
-
-Qualora venga passato uno stream come argomento, l'output sarà diretto a tale stream;
-In assenza di uno stream esplicitamente indicato, l'output verrà prodotto sullo stream corrente.
 
 ## Autori
 Progetto del corso di Linguaggi e Programmazione, realizzato da:

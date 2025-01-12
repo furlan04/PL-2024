@@ -13,10 +13,10 @@ La libreria utilizza la funzione **urilib-parse**, che restituisce un **uri-stru
 
 Per utilizzare il programma basterà quindi eseguire la funzione **urilib-parse**.
 
-Un esempio di chiamata è:
+Un esempio di chiamata è:  
 **(urilib-parse ”http://disco.unimib.it”)**
 
-L'output ricevuto sarà:
+L'output ricevuto sarà:  
 *#S(URI-STRUCT :SCHEME "http" :USERINFO NIL :HOST "disco.unimib.it" :PORT 80 :PATH NIL :QUERY NIL :FRAGMENT NIL)*
 
 
@@ -58,7 +58,7 @@ Questo parser riconosce diversi schemi per gli URI:
 	- fax
 	- zos
 
-Per fare ciò, viene prima riconosciuto lo schema utilizzato, poi vengono impiegate diverse funzioni, ognuna in grado di eseguire il parse dei singoli componenti.
+Questo ci permette prima di riconosciuto lo schema utilizzato, poi di impiegare diverse funzioni, ognuna in grado di eseguire il parse dei singoli componenti.
 
 A seconda che si utilizzi uno schema speciale o generale, si applicano regole sintattiche differenti, che possono portare alla scomposizione della stringa e alla restituzione del risultato, questo perchè non per ogni schema l'URI conterrà tutti i componenti standard sopra indicati, e potrebbero essere contenuti in formati diversi;
 

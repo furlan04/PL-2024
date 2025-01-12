@@ -22,6 +22,13 @@ Il risultato della query sarà:
 *URI = uri(http, [], ’disco.unimib.it’, 80, [], [], [])*
 
 
+---
+
+Sono disponibili due predicati, **uri_display/1** e **uri_display/2**, per stampare su uno stream di destinazione.
+
+Nel caso di **uri_display/2**, lo schema deve essere fornito come argomento, mentre **uri_display/1** utilizza lo stream corrente per richiamare **uri_display/2**.
+
+
 ## Funzionamento
 
 La libreria suddivide la stringa dell'URI nei seguenti componenti:
@@ -65,11 +72,7 @@ Ecco una tabella che indica quali componenti troviamo in un URI di ogni schema:
 | Fax    | Schema, Userinfo |
 | Zos    | Schema, Userinfo, Host, Port, Path, Query, Fragment  |
 
----
 
-Sono disponibili due predicati, **uri_display/1** e **uri_display/2**, per stampare su uno stream di destinazione.
-
-Nel caso di **uri_display/2**, lo schema deve essere fornito come argomento, mentre **uri_display/1** utilizza lo stream corrente per richiamare **uri_display/2**.
 
 ## Autori
 Progetto del corso di Linguaggi e Programmazione, realizzato da:

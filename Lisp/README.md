@@ -9,7 +9,7 @@ Questo progetto realizza una libreria implementata in **Common Lisp** (un dialet
 
 ## Utilizzo
 
-La libreria utilizza la funzione **urilib-parse**, che restituisce un **uri-struct** che contiene i componenti di un URI scomposto, a partire da una stringa contenente un URI in formato testuale;
+La libreria utilizza la funzione **urilib-parse**, che restituisce un **urilib-structure** che contiene i componenti di un URI scomposto, a partire da una stringa contenente un URI in formato testuale;
 
 Per utilizzare il programma basterà quindi eseguire la funzione **urilib-parse**.
 
@@ -17,7 +17,7 @@ Un esempio di chiamata è:
 **(urilib-parse ”http://disco.unimib.it”)**
 
 L'output ricevuto sarà:  
-*#S(URI-STRUCT :SCHEME "http" :USERINFO NIL :HOST "disco.unimib.it" :PORT 80 :PATH NIL :QUERY NIL :FRAGMENT NIL)*
+*#S(URILIB-STRUCTURE :SCHEME "http" :USERINFO NIL :HOST "disco.unimib.it" :PORT 80 :PATH NIL :QUERY NIL :FRAGMENT NIL)*
 
 ---
 
@@ -38,7 +38,7 @@ La libreria suddivide la stringa dell'URI nei seguenti componenti:
 6. Query
 7. Fragment
 
-Questo è eseguito grazie all'esistenza di una funzione per ogni componente dell'URI presente in uri-struct, in grado di restituire il singolo componente dallo struct:
+Questo è eseguito grazie all'esistenza di una funzione per ogni componente dell'URI presente in urilib-structure, in grado di restituire il singolo componente dallo struct:
 
 - **urilib-scheme**
 - **urilib-userinfo**
@@ -80,7 +80,7 @@ Ecco una tabella che indica quali componenti troviamo in un URI di ogni schema:
 | Fax    | Schema, Userinfo |
 | Zos    | Schema, Userinfo, Host, Port, Path, Query, Fragment  |
 
-Nel caso in cui un componente non sia presente, nell' uri-struct di output sarà presente "NIL" nella voce di quel componente (vedi esempio sopra riportato, dove non sono presenti Userinfo, Path, Query e Fragment).
+Nel caso in cui un componente non sia presente, nell' urilib-structure di output sarà presente "NIL" nella voce di quel componente (vedi esempio sopra riportato, dove non sono presenti Userinfo, Path, Query e Fragment).
 
 
 

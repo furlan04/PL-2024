@@ -1,3 +1,4 @@
+% predicate urilib_parse/2
 urilib_parse(URIString, URI) :-
     string(URIString),
     atom_codes(URIString, Codes),
@@ -5,6 +6,9 @@ urilib_parse(URIString, URI) :-
     atom_codes(Schema, SchemaCodes),
     parse_uri_with_schema(Schema, AfterSchema, URI).
 
+% predicate urilib_display/1 e urilib_display/2
+% prints the URI components to the current output stream
+% or to the specified stream
 urilib_display(URI) :-
     current_output(Stream),
     urilib_display(URI, Stream).
@@ -19,31 +23,20 @@ urilib_display(URI, Stream) :-
     format(Stream, 'Fragment = ~w\n', [Fragment]),
     close(Stream).
 
-    %!  parse_uri_with_schema(+Schema, +AfterSchema, -URI)
-    %
+% predicate parse_uri_with_schema/3
+%  Schema: URI schema
+%  AfterSchema: remaining characters after the schema
+%  URI: parsed URI 
 
-    % Schema seguito dal nulla
 parse_uri_with_schema(Schema, [], URI) :-
     Schema \= '',
     default_port(Schema, Port),
     !,
     URI = uri(Schema, [], [], Port, [], [], []).
 
-% -- FORMATO ZOS --
-
-% ZOS: Path completo con Query e Fragment
-
-%   Parse di un URI senza Fragment secondo il formato dello Schema zos.
-parse_uri_with_schema(Schema, AfterSchema, URI) :-
-    Schema = 'zos',
-    authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
-    isolate_path(AfterAuthority, PathCodes, AfterPath),
-    zos_path(PathCodes),
-    query(AfterPath, QueryCodes, []),
-    !,
-    atom_codes(Path, PathCodes),
-    atom_codes(Query, QueryCodes),
-    URI = uri(Schema, Userinfo, Host, Port, Path, Query, []).
+% -- ZOS FORMAT --
+% authority is handled like in the generic format
+% path parsed as required by the zos format
 
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     Schema = 'zos',
@@ -56,7 +49,17 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     atom_codes(Query, QueryCodes),
     URI = uri(Schema, Userinfo, Host, Port, Path, Query, []).
 
-%   Parse di un URI senza Query secondo il formato dello Schema zos.
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    Schema = 'zos',
+    authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    isolate_path(AfterAuthority, PathCodes, AfterPath),
+    zos_path(PathCodes),
+    query(AfterPath, QueryCodes, []),
+    !,
+    atom_codes(Path, PathCodes),
+    atom_codes(Query, QueryCodes),
+    URI = uri(Schema, Userinfo, Host, Port, Path, Query, []).
+
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     Schema = 'zos',
     authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
@@ -68,8 +71,6 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     atom_codes(Fragment, FragmentCodes),
     URI = uri(Schema, Userinfo, Host, Port, Path, [], Fragment).
 
-%   Parse di un URI senza Query e Fragment secondo il formato dello 
-% Schema zos.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     Schema = 'zos',
     authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
@@ -111,7 +112,6 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     path_codes_empty(QueryCodes, Query),
     URI = uri(Schema, Userinfo, Host, Port, [], Query, []).
 
-%   Parse di un URI completo secondo il formato dello Schema zos.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     Schema = 'zos',
     authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
@@ -201,7 +201,10 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     path_codes_empty(QueryCodes, Query),
     URI = uri(Schema, [], [], Port, [], Query, []).
 
-%   Parse di un URI senza Path secondo il formato generico.
+% -- GENERIC FORMAT --
+% authority is handled like in the generic format
+% path parsed as required by the generic format
+
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     generic_scheme(Schema),
     authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
@@ -213,7 +216,6 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     atom_codes(Fragment, FragmentCodes),
     URI = uri(Schema, Userinfo, Host, Port, [], Query, Fragment).
 
-%   Parse di un URI senza Fragment secondo il formato generico.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     generic_scheme(Schema),
     authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
@@ -224,7 +226,6 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     atom_codes(Query, QueryCodes),
     URI = uri(Schema, Userinfo, Host, Port, Path, Query, []).
 
-%   Parse di un URI senza Query secondo il formato generico.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     generic_scheme(Schema),
     authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
@@ -235,7 +236,6 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     atom_codes(Fragment, FragmentCodes),
     URI = uri(Schema, Userinfo, Host, Port, Path, [], Fragment).
 
-%   Parse di un URI senza Query e Fragment secondo il formato generico.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     generic_scheme(Schema),
     authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
@@ -244,7 +244,6 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     path_codes_empty(PathCodes, Path),
     URI = uri(Schema, Userinfo, Host, Port, Path, [], []).
 
-%   Parse di un URI senza Path e Fragment secondo il formato generico.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     generic_scheme(Schema),
     authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
@@ -254,7 +253,6 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     atom_codes(Query, QueryCodes),
     URI = uri(Schema, Userinfo, Host, Port, [], Query, []).
 
-%   Parse di un URI senza Path e Query secondo il formato generico.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     generic_scheme(Schema),
     authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
@@ -264,8 +262,6 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     atom_codes(Fragment, FragmentCodes),
     URI = uri(Schema, Userinfo, Host, Port, [], [], Fragment).
 
-%   Parse di un URI senza Path, Query e Fragment secondo il formato generico,
-%   terminato dal carattere "/".
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     generic_scheme(Schema),
     authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
@@ -273,14 +269,12 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     !,
     URI = uri(Schema, Userinfo, Host, Port, [], [], []).
 
-%   Parse di un URI senza Path, Query e Fragment secondo il formato generico.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
     check_last(AfterAuthority),
     !,
     URI = uri(Schema, Userinfo, Host, Port, [], [], []).
 
-%   Parse di un URI completo secondo il formato generico.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     generic_scheme(Schema),
     authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
@@ -341,8 +335,10 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     atom_codes(Fragment, FragmentCodes),
     URI = uri(Schema, [], [], Port, Path, [], Fragment).
 
-%   Parse di un URI contenente solo Userinfo secondo il formato dello Schema
-%   mailto.
+% -- MAILTO FORMAT --
+% mandatory Userinfo
+% Host is optional
+
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     Schema = 'mailto',
     plain_userinfo(AfterSchema, U, []),
@@ -351,8 +347,6 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     Userinfo \= '',
     URI = uri('mailto', Userinfo, [], [], [], [], []).
 
-%   Parse di un URI contenente Userinfo e Host secondo il formato dello Schema
-%   mailto.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     Schema = 'mailto',
     plain_userinfo(AfterSchema, U, AfterUserinfo),
@@ -363,7 +357,10 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     atom_codes(Host, H),
     URI = uri('mailto', Userinfo, Host, [], [], [], []).
 
-% Parse di un URI contenente solo l'Host secondo il formato dello Schema news
+% -- NEWS FORMAT --
+% mandatory Host
+% no other components
+
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     Schema = 'news',
     host(AfterSchema, H, []),
@@ -371,8 +368,10 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     atom_codes(Host, H),
     URI = uri('news', [], Host, [], [], [], []).
 
-%   Parse di un URI contenente solo Userinfo secondo il formato degli Schema
-%   tel e fax.
+% -- TEL AND FAX FORMAT --
+% mandatory Userinfo
+% no other component
+
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     tel_or_fax(Schema),
     plain_userinfo(AfterSchema, U, []),
@@ -380,15 +379,9 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     atom_codes(Userinfo, U),
     URI = uri(Schema, Userinfo, [], [], [], [], []).
 
-tel_or_fax('tel').
-tel_or_fax('fax').
+% PARSING of the separate URI components
 
-check_last([]).
-check_last([47]).
-
-%!  schema(+Codes, -Schema, -After)
-%
-%   Lo Schema viene estratto dai codici passati in input.
+% Schema parsing
 
 schema([C | Codes], Schema, After) :-
     C = 58, % :
@@ -401,16 +394,7 @@ schema([C | Codes], Schema, After) :-
     schema(Codes, S, After),
     Schema = [C | S].
 
-%!  authority(+Codes, -Userinfo, -Host, -Port, -After)
-%
-%   I componenti dell'Authority vengono estratti dai codici passati in input.
-
-%   Parse di Authority completa.
-%!  authority(+Codes, -Userinfo, -Host, -Port, -After)
-%
-%   I componenti dell'Authority vengono estratti dai codici passati in input.
-
-%   Parse di Authority completa.
+% default port handling, based on the schema
 
 default_port(http, 80).
 default_port(https, 443).
@@ -420,9 +404,12 @@ default_port(mailto, 25).
 default_port(ftp, 21).
 default_port(_, 80).
 
+% Authority parsing
+
+% check if the input is a valid IP address
 ip_or_host(Chars, H, AfterHost) :-
     ip(Chars, H, AfterHost).
-
+% check if the input is a valid host
 ip_or_host(Chars, H, AfterHost) :-
     host(Chars, H, AfterHost).
 
@@ -438,7 +425,6 @@ authority(_, [C1, C2 | Chars], Userinfo, Host, Port, After) :-
     Host \= '',
     number_codes(Port, P).
 
-%   Parse di Authority senza Userinfo.
 authority(_, [C1, C2 | Chars], Userinfo, Host, Port, After) :-
     C1 = 47, % /
     C2 = 47, % /
@@ -450,7 +436,6 @@ authority(_, [C1, C2 | Chars], Userinfo, Host, Port, After) :-
     Host \= '',
     number_codes(Port, P).
 
-%   Parse di Authority senza Port, sostituita quindi da quella di default.
 authority(Schema, [C1, C2 | Chars], Userinfo, Host, Port, After) :-
     C1 = 47, % /
     C2 = 47, % /
@@ -462,7 +447,6 @@ authority(Schema, [C1, C2 | Chars], Userinfo, Host, Port, After) :-
     Host \= '',
     default_port(Schema, Port).
 
-%   Parse di Authority senza Userinfo e Port.
 authority(Schema, [C1, C2 | Chars], Userinfo, Host, Port, After) :-
     C1 = 47, % /
     C2 = 47, % /
@@ -473,7 +457,6 @@ authority(Schema, [C1, C2 | Chars], Userinfo, Host, Port, After) :-
     Host \= '',
     default_port(Schema, Port).
 
-%   Parse di Authority non presente, quindi si passa direttamente al Path.
 authority(Schema, [C1, C2 | Chars], Userinfo, Host, Port, After) :-
     C1 = 47,
     C2 \= 47,
@@ -501,9 +484,7 @@ authority(Schema, [C1, C2 | Chars], Userinfo, Host, Port, After) :-
     default_port(Schema, Port),
     After = [C1, C2 | Chars].
 
-%!  userinfo(+Codes, -Userinfo, -After)
-%
-%   Lo Userinfo viene estratto dai codici passati in input.
+% parsing Userinfo
 
 userinfo([C | Codes], Userinfo, After) :-
     C = 64, % @
@@ -515,10 +496,6 @@ userinfo([C | Codes], Userinfo, After) :-
     !,
     userinfo(Codes, U, After),
     Userinfo = [C | U].
-
-%!  plain_userinfo(+Codes, -Userinfo, -After)
-%
-%   Lo Userinfo viene estratto dai codici passati in input.
 
 plain_userinfo([], Userinfo, After) :-
     Userinfo = [],
@@ -534,18 +511,7 @@ plain_userinfo([C | Codes], Userinfo, After) :-
     plain_userinfo(Codes, U, After),
     Userinfo = [C | U].
 
-%!  host(+Codes, -Host, -After)
-%
-%   L'Host viene estratto dai codici passati in input.
-
-special_char(C) :-
-    C = 58.
-special_char(C) :-
-    C = 47.
-special_char(C) :-
-    C = 63.
-special_char(C) :-
-    C = 35.
+% parsing Host
 
 host([], Host, After) :-
     Host = [],
@@ -557,9 +523,8 @@ host([C | Codes], Host, After) :-
     Host = [],
     After = [C | Codes].
 
-% Verifichiamo che l'host inizi con una lettera
 host([C | Codes], Host, After) :-
-    is_alpha(C),  % deve iniziare con una lettera
+    is_alpha(C),
     !,
     host_aux(Codes, C, RestHost, After),
     Host = [C | RestHost].
@@ -574,20 +539,23 @@ host_aux([C | Codes], _, Host, After) :-
     Host = [],
     After = [C | Codes].
 
-host_aux([46 | Codes], PrevChar, Host, After) :-  % caso del punto
-    PrevChar \= 46,  % verifica che il carattere precedente non sia un punto
-    Codes = [C2 | Rest],  % prendi il carattere dopo il punto
-    is_alpha(C2),  % deve essere una lettera
+% check if . are followed by a letter
+host_aux([46 | Codes], PrevChar, Host, After) :-  
+    PrevChar \= 46,  
+    Codes = [C2 | Rest],  
+    is_alpha(C2), 
     !,
     host_aux(Rest, C2, RestHost, After),
     Host = [46, C2 | RestHost].
 
 host_aux([C | Codes], _, Host, After) :-
-    C \= 46,  % non punto
+    C \= 46,
     is_alnum(C),
     !,
     host_aux(Codes, C, RestHost, After),
     Host = [C | RestHost].
+
+% parsing IP
 
 ip(Codes, Host, After):-
     octet(Codes, FirstOctet, [46 | AfterFirstOctet]),
@@ -601,12 +569,6 @@ ip(Codes, Host, After):-
     append(FourthAppend, ThirdAppend, FifthAppend),
     append(FifthAppend, FourthOctet, Host).
 
-%!  octet(+Codes, -Octet, -After)
-%
-%   Vengono estratti e convertiti gli otto bit che compongono un ottetto
-%   dai codici passati in input.
-
-%   Ottetto composto da tre cifre.
 octet([A, B, C | After], Octet, After):-
     is_digit(A),
     is_digit(B),
@@ -617,7 +579,6 @@ octet([A, B, C | After], Octet, After):-
     Octet = [A, B, C],
     !.
 
-%   Ottetto composto da due cifre.
 octet([A, B | After], Octet, After):-
     is_digit(A),
     is_digit(B),
@@ -627,7 +588,6 @@ octet([A, B | After], Octet, After):-
     Octet = [A, B],
     !.
 
-%   Ottetto composto da una cifra.
 octet([A | After], Octet, After):-
     is_digit(A),
     number_codes(Number, [A]),
@@ -636,11 +596,8 @@ octet([A | After], Octet, After):-
     Octet = [A],
     !.
 
-%!  port(+Codes, -Port, -After)
-%
-%   Viene estratta Port dai codici passati in input.
+% parsing Port
 
-% Port must contain only digits and return false for invalid input
 port([58 | Codes], Port, After) :-  % :
     port_aux(Codes, Port, After),
     Port \= [],
@@ -654,12 +611,7 @@ port_aux([C | Codes], [C | Port], After) :-
     is_digit(C),
     port_aux(Codes, Port, After).
 
-path_accettati_secondo_char(C) :-
-    identificatore(C).
-path_accettati_secondo_char(C) :-
-    C = 63.
-path_accettati_secondo_char(C) :-
-    C = 35.
+% parsing Path
 
 path([47, C | Codes], Path, After) :-  % /
     path_accettati_secondo_char(C),
@@ -672,14 +624,8 @@ path_aux([47, C | Codes], [47, C | Path], After) :-
     identificatore(C),
     path_aux(Codes, Path, After).
 path_aux([C | Codes], [C | Path], After) :-
-    identificatore(C),  % This will fail if C is not a valid character
+    identificatore(C),
     path_aux(Codes, Path, After).
-
-%
-%   Viene estratto il Path dai codici passati in input secondo il formato
-%   dello Schema zos.
-
-%   Parse del Path contenente solo Id44 secondo il formato dello Schema zos.
 
 isolate_path([47 | Codes], Path, After) :-  % /
     isolate_path_aux(Codes, Path, After).
@@ -690,6 +636,8 @@ isolate_path_aux([35 | Rest], [], [35 | Rest]) :- !.  % #.
 isolate_path_aux([C | Codes], [C | Path], After) :-
     isolate_path_aux(Codes, Path, After).
 
+% parsing Path secondo lo Schema zos
+
 zos_path([C | Codes]) :-
     is_alpha(C),
     id44([C | Codes], Id44Codes, []),
@@ -699,7 +647,6 @@ zos_path([C | Codes]) :-
     last(Id44Codes, LastId44Character),
     LastId44Character \= 46.
 
-%   Parse del Path contenente Id44 e Id8 secondo il formato dello Schema zos.
 zos_path([C | Codes]) :-
     is_alpha(C),
     id44([C | Codes], Id44Codes, AfterId44Codes),
@@ -711,10 +658,7 @@ zos_path([C | Codes]) :-
     length(Id8Codes, Id8Length),
     Id8Length =< 8.
 
-%!  id44(+Codes, -Id44, -After)
-%
-%   Viene estratto l'Id44 dai codici passati in input che compongono un Path,
-%   secondo il formato dello Schema zos.
+% checks if the input is a valid id44
 
 id44([], Id44, After) :-
     Id44 = [],
@@ -725,16 +669,17 @@ id44([C | Codes], Id44, After) :-
     Id44 = [],
     After = [C | Codes].
 id44([C | Codes], Id44, After) :-
-    (is_alnum(C);
-     C = 46), % .
+    is_alnum(C),
+    !,
+    id44(Codes, I, After),
+    Id44 = [C | I].
+id44([C | Codes], Id44, After) :-
+    C = 46, % .
     !,
     id44(Codes, I, After),
     Id44 = [C | I].
 
-%!  id8(+Codes, -Id44, -After)
-%
-%   Viene estratto l'Id8 dai codici passati in input che compongono un Path,
-%   secondo il formato dello Schema zos.
+% checks if the input is a valid id8
 
 parse_id8([C | []], Id8) :-
     C = 41, % )
@@ -751,9 +696,7 @@ id8([C1, C2 | Codes], Id8) :-
     !,
     parse_id8([C2 | Codes], Id8).
 
-%!  query(+Codes, -Query, -After)
-%
-%   Viene estratto il componente Query dai codici passati in input.
+% parsing Query
 
 parse_query([], Query, After) :-
     Query = [],
@@ -786,6 +729,8 @@ fragment([C | Codes], Fragment, After) :-
     !,
     parse_fragment(Codes, Fragment, After).
 
+% UTILITY PREDICATES
+
 caratteri(C) :-
     is_alnum(C).
 caratteri(C) :-
@@ -815,9 +760,30 @@ generic_scheme(Schema) :-
     Schema \= 'fax',
     Schema \= 'news'.
 
-
 path_codes_empty(PathCodes, Path) :-
     PathCodes = [],        
     Path = []. 
 path_codes_empty(PathCodes, Path) :-
     atom_codes(Path, PathCodes).
+
+tel_or_fax('tel').
+tel_or_fax('fax').
+
+check_last([]).
+check_last([47]).
+
+special_char(C) :-
+    C = 58.
+special_char(C) :-
+    C = 47.
+special_char(C) :-
+    C = 63.
+special_char(C) :-
+    C = 35.
+
+path_accettati_secondo_char(C) :-
+    identificatore(C).
+path_accettati_secondo_char(C) :-
+    C = 63.
+path_accettati_secondo_char(C) :-
+    C = 35.

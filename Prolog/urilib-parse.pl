@@ -29,7 +29,7 @@ urilib_display(URI, Stream) :-
 %  URI: parsed URI 
 
 parse_uri_with_schema(Schema, [], URI) :-
-    Schema \= '',
+    generic_scheme(Schema),
     default_port(Schema, Port),
     !,
     URI = uri(Schema, [], [], Port, [], [], []).
@@ -79,38 +79,6 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     !,
     atom_codes(Path, PathCodes),
     URI = uri(Schema, Userinfo, Host, Port, Path, [], []).
-
-parse_uri_with_schema(Schema, AfterSchema, URI) :-
-    Schema = 'zos',
-    authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
-    isolate_path(AfterAuthority, PathCodes, AfterPath),
-    PathCodes = [],
-    query(AfterPath, QueryCodes, AfterQuery),
-    fragment(AfterQuery, FragmentCodes, []),
-    !,
-    path_codes_empty(QueryCodes, Query),
-    path_codes_empty(FragmentCodes, Fragment),
-    URI = uri(Schema, Userinfo, Host, Port, [], Query, Fragment).
-
-parse_uri_with_schema(Schema, AfterSchema, URI) :-
-    Schema = 'zos',
-    authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
-    isolate_path(AfterAuthority, PathCodes, AfterPath),
-    PathCodes = [],
-    fragment(AfterPath, FragmentCodes, []),
-    !,
-    path_codes_empty(FragmentCodes, Fragment),
-    URI = uri(Schema, Userinfo, Host, Port, [], [], Fragment).
-
-parse_uri_with_schema(Schema, AfterSchema, URI) :-
-    Schema = 'zos',
-    authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
-    isolate_path(AfterAuthority, PathCodes, AfterPath),
-    PathCodes = [],
-    query(AfterPath, QueryCodes, []),
-    !,
-    path_codes_empty(QueryCodes, Query),
-    URI = uri(Schema, Userinfo, Host, Port, [], Query, []).
 
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     Schema = 'zos',
@@ -168,38 +136,6 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     atom_codes(Path, PathCodes),
     atom_codes(Fragment, FragmentCodes),
     URI = uri(Schema, [], [], Port, Path, [], Fragment).
-
-parse_uri_with_schema(Schema, AfterSchema, URI) :-
-    Schema = 'zos',
-    isolate_path_aux(AfterSchema, PathCodes, AfterPath),
-    PathCodes = [],
-    query(AfterPath, QueryCodes, AfterQuery),
-    fragment(AfterQuery, FragmentCodes, []),
-    default_port(Schema, Port),
-    !,
-    path_codes_empty(QueryCodes, Query),
-    path_codes_empty(FragmentCodes, Fragment),
-    URI = uri(Schema, [], [], Port, [], Query, Fragment).
-
-parse_uri_with_schema(Schema, AfterSchema, URI) :-
-    Schema = 'zos',
-    isolate_path_aux(AfterSchema, PathCodes, AfterPath),
-    PathCodes = [],
-    fragment(AfterPath, FragmentCodes, []),
-    default_port(Schema, Port),
-    !,
-    path_codes_empty(FragmentCodes, Fragment),
-    URI = uri(Schema, [], [], Port, [], [], Fragment).
-
-parse_uri_with_schema(Schema, AfterSchema, URI) :-
-    Schema = 'zos',
-    isolate_path_aux(AfterSchema, PathCodes, AfterPath),
-    PathCodes = [],
-    query(AfterPath, QueryCodes, []),
-    default_port(Schema, Port),
-    !,
-    path_codes_empty(QueryCodes, Query),
-    URI = uri(Schema, [], [], Port, [], Query, []).
 
 % -- GENERIC FORMAT --
 % authority is handled like in the generic format
@@ -270,6 +206,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     URI = uri(Schema, Userinfo, Host, Port, [], [], []).
 
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    generic_scheme(Schema),
     authority(Schema, AfterSchema, Userinfo, Host, Port, AfterAuthority),
     check_last(AfterAuthority),
     !,

@@ -301,6 +301,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     Schema = 'news',
     host(AfterSchema, H, []),
+    H \= [],
     !,
     atom_codes(Host, H),
     URI = uri('news', [], Host, [], [], [], []).
@@ -312,6 +313,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     tel_or_fax(Schema),
     plain_userinfo(AfterSchema, U, []),
+    U \= [],
     !,
     atom_codes(Userinfo, U),
     URI = uri(Schema, Userinfo, [], [], [], [], []).
